@@ -21,7 +21,44 @@ TEST(VecOpTest, BasicAssertions) {
     EXPECT_FLOAT_EQ(c[2], 3.0 * 6.0 * 0.5);
 }
 
-// TODO: add more tests and apply necessary changes
+TEST(VecOpZeroVecATest, BasicAssertions) {
+    std::vector<float> a = {0.0, 0.0, 0.0};
+    std::vector<float> b = {4.0, 5.0, 6.0};
+    std::vector<float> c;
+
+    swiftware::hpp::vec_op(a, b, c);
+
+    ASSERT_EQ(c.size(), a.size());
+    EXPECT_FLOAT_EQ(c[0], 0.0 * 4.0 * 0.5);
+    EXPECT_FLOAT_EQ(c[1], 0.0 * 5.0 * 0.5);
+    EXPECT_FLOAT_EQ(c[2], 0.0 * 6.0 * 0.5);
+}
+
+TEST(VecOpZeroVecBTest, BasicAssertions) {
+    std::vector<float> a = {1.0, 2.0, 3.0};
+    std::vector<float> b = {0.0, 0.0, 0.0};
+    std::vector<float> c;
+
+    swiftware::hpp::vec_op(a, b, c);
+
+    ASSERT_EQ(c.size(), a.size());
+    EXPECT_FLOAT_EQ(c[0], 1.0 * 0.0 * 0.5);
+    EXPECT_FLOAT_EQ(c[1], 2.0 * 0.0 * 0.5);
+    EXPECT_FLOAT_EQ(c[2], 3.0 * 0.0 * 0.5);
+}
+
+TEST(VecOpBothZeroVecTest, BasicAssertions) {
+    std::vector<float> a = {0.0, 0.0, 0.0};
+    std::vector<float> b = {0.0, 0.0, 0.0};
+    std::vector<float> c;
+
+    swiftware::hpp::vec_op(a, b, c);
+
+    ASSERT_EQ(c.size(), a.size());
+    EXPECT_FLOAT_EQ(c[0], 0.0 * 0.0 * 0.5);
+    EXPECT_FLOAT_EQ(c[1], 0.0 * 0.0 * 0.5);
+    EXPECT_FLOAT_EQ(c[2], 0.0 * 0.0 * 0.5);
+}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

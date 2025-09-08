@@ -12,10 +12,15 @@ namespace swiftware::hpp {
    for (int i = 0; i < n; ++i) {
     c[i] = 0.5 * a[i] * b[i];
    }
-
-
-   // TODO: add another vector addition implementation
-
-
   }
- }
+
+    void vec_op(std::vector<float> a, std::vector<float> b, std::vector<float> &c) {
+        int n = std::max(a.size(), b.size());
+        a.resize(n);
+        b.resize(n);
+        c.resize(n);
+        for (int i = n - 1; i >= 0; i--) {
+            c[i] = 0.5 * a[i] * b[i];
+        }
+    }
+}
