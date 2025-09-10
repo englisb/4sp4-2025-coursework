@@ -14,7 +14,7 @@ namespace swiftware::hpp {
    }
   }
 
-    void vec_op(std::vector<float> a, std::vector<float> b, std::vector<float> &c) {
+    void vec_op_custom(std::vector<float> a, std::vector<float> b, std::vector<float> &c) {
         int n = std::max(a.size(), b.size());
         a.resize(n);
         b.resize(n);

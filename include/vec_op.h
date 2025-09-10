@@ -15,6 +15,7 @@ namespace swiftware::hpp {
    /// \param b The second vector
    /// \param c The result vector
    void vec_op(std::vector<float> a, std::vector<float> b, std::vector<float>& c);
+   void vec_op_custom(std::vector<float> a, std::vector<float> b, std::vector<float>& c);
 
   }
 #endif //BASICS_VEC_ADD_H
