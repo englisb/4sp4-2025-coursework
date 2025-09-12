@@ -52,7 +52,7 @@ TEST(VecOpSizeMismatchTest, BasicAssertions) {
     swiftware::hpp::vec_op(a, b, c);
 
     ASSERT_EQ(c.size(), a.size());
-    ASSERT_EQ(a.size(), b.size());
+    ASSERT_NE(a.size(), b.size());
 }
 
 int main(int argc, char **argv) {
