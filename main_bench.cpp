@@ -32,11 +32,35 @@ static void BM_SORT_STD(benchmark::State &state) {
 
 // TODO add more benchmarks for other sorting algorithms
 
+static void BM_QUICKSORT(benchmark::State &state) {
+  auto m = state.range(0);
+  auto *A = new int[m]();
+  swiftware::hpp::fill_random(A, m, 0, 1000000);
+
+  for (auto _: state) {
+    swiftware::hpp::quick_sort(A,m);
+  }
+
+  // verify correctness
+  if (!swiftware::hpp::is_sorted(A, m)) {
+    std::cerr << state.name() <<  "Array is not sorted!" << std::endl;
+    state.SkipWithError("Array is not sorted");
+  } else {
+    state.SetComplexityN(m);
+    state.SetItemsProcessed(m);
+  }
+  delete[] A;
+}
+
 #define MAXSIZE 32*1024
 
 
 BENCHMARK(BM_SORT_STD)->ArgsProduct({benchmark::CreateRange(4, MAXSIZE, /*multi=*/2), {1}})
     ->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(50);
+
+BENCHMARK(BM_QUICKSORT)->ArgsProduct({benchmark::CreateRange(4, MAXSIZE, /*multi=*/2), {1}})
+    ->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(50);
+
 
 
 BENCHMARK_MAIN();
