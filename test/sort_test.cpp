@@ -7,10 +7,80 @@
 #include "sort_algorithms.h"
 #include <vector>
 
-// TODO : add more tests
+// Test cases for selection sort algorithm
 
-TEST(SortTest, BasicAssertions) {
-    ASSERT_TRUE(false);
+TEST(SelectionSortTest, SortRandomArray) {
+    int arr[] = {64, 34, 25, 12, 22, 11, 90};
+    int expected[] = {11, 12, 22, 25, 34, 64, 90};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    
+    swiftware::hpp::selection_sort(arr, n);
+    
+    for (int i = 0; i < n; i++) {
+        EXPECT_EQ(arr[i], expected[i]);
+    }
+}
+
+TEST(SelectionSortTest, SortAlreadySortedArray) {
+    int arr[] = {1, 2, 3, 4, 5};
+    int expected[] = {1, 2, 3, 4, 5};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    
+    swiftware::hpp::selection_sort(arr, n);
+    
+    for (int i = 0; i < n; i++) {
+        EXPECT_EQ(arr[i], expected[i]);
+    }
+}
+
+TEST(SelectionSortTest, SortReverseSortedArray) {
+    int arr[] = {9, 7, 5, 3, 1};
+    int expected[] = {1, 3, 5, 7, 9};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    
+    swiftware::hpp::selection_sort(arr, n);
+    
+    for (int i = 0; i < n; i++) {
+        EXPECT_EQ(arr[i], expected[i]);
+    }
+}
+
+// Test cases for bubble sort algorithm
+
+TEST(BubbleSortTest, SortArrayWithDuplicates) {
+    int arr[] = {5, 2, 8, 2, 9, 1, 5, 4};
+    int expected[] = {1, 2, 2, 4, 5, 5, 8, 9};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    
+    swiftware::hpp::bubble_sort(arr, n);
+    
+    for (int i = 0; i < n; i++) {
+        EXPECT_EQ(arr[i], expected[i]);
+    }
+}
+
+TEST(BubbleSortTest, SortSingleElementArray) {
+    int arr[] = {42};
+    int expected[] = {42};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    
+    swiftware::hpp::bubble_sort(arr, n);
+    
+    for (int i = 0; i < n; i++) {
+        EXPECT_EQ(arr[i], expected[i]);
+    }
+}
+
+TEST(BubbleSortTest, SortNegativeNumbers) {
+    int arr[] = {-3, -1, -7, -2, -5};
+    int expected[] = {-7, -5, -3, -2, -1};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    
+    swiftware::hpp::bubble_sort(arr, n);
+    
+    for (int i = 0; i < n; i++) {
+        EXPECT_EQ(arr[i], expected[i]);
+    }
 }
 
 
