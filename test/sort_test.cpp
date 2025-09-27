@@ -83,6 +83,44 @@ TEST(BubbleSortTest, SortNegativeNumbers) {
     }
 }
 
+// Test cases for quick sort algorithm
+
+TEST(QuickSortTest, SortAllIdenticalElements) {
+    int arr[] = {7, 7, 7, 7, 7, 7};
+    int expected[] = {7, 7, 7, 7, 7, 7};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    
+    swiftware::hpp::quick_sort(arr, n);
+    
+    for (int i = 0; i < n; i++) {
+        EXPECT_EQ(arr[i], expected[i]);
+    }
+}
+
+TEST(QuickSortTest, SortWorstCaseScenario) {
+    int arr[] = {10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
+    int expected[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    
+    swiftware::hpp::quick_sort(arr, n);
+    
+    for (int i = 0; i < n; i++) {
+        EXPECT_EQ(arr[i], expected[i]);
+    }
+}
+
+TEST(QuickSortTest, SortMixedPositiveNegativeZero) {
+    int arr[] = {10, -5, 0, 3, -12, 8, -1};
+    int expected[] = {-12, -5, -1, 0, 3, 8, 10};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    
+    swiftware::hpp::quick_sort(arr, n);
+    
+    for (int i = 0; i < n; i++) {
+        EXPECT_EQ(arr[i], expected[i]);
+    }
+}
+
 
 
 int main(int argc, char **argv) {
