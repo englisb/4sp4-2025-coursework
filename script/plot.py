@@ -262,9 +262,6 @@ def process_benchmarks(LOG):
     if df.empty:
         raise SystemExit("No benchmark entries found in " + str(LOG))
 
-    # Save raw table
-    df.to_csv(ROOT / "logs" / "bench_raw.csv", index=False)
-
     # Group summary per algo & size
     summary = df.groupby(["algo", "size"]).real_time.agg(["mean", "median", "std", "count"]).reset_index()
     if "mean" in summary.columns:
