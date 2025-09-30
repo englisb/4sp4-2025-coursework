@@ -40,11 +40,36 @@ namespace swiftware::hpp
   }
 
   void selection_sort(int *A, int n){
-    //TODO
+    for (int i = 0; i < n - 1; i++) {
+      int min_idx = i;
+      // Find the minimum element in the remaining unsorted array
+      for (int j = i + 1; j < n; j++) {
+        if (A[j] < A[min_idx]) {
+          min_idx = j;
+        }
+      }
+      // Swap the found minimum element with the first element
+      if (min_idx != i) {
+        std::swap(A[i], A[min_idx]);
+      }
+    }
   }
 
   void bubble_sort(int *A, int n){
-    // TODO
+    for (int i = 0; i < n - 1; i++) {
+      bool swapped = false;
+      // Last i elements are already in place
+      for (int j = 0; j < n - i - 1; j++) {
+        if (A[j] > A[j + 1]) {
+          std::swap(A[j], A[j + 1]);
+          swapped = true;
+        }
+      }
+      // If no two elements were swapped, array is sorted
+      if (!swapped) {
+        break;
+      }
+    }
   }
 
 }
