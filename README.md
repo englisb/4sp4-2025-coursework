@@ -130,7 +130,7 @@ The Cholesky decomposition algorithm iteratively computes the elements of the
 lower triangular matrix `L` using the following formulas:
 ```angular2html
 L[i][i] = sqrt(A[i][i] - sum(L[i][k]^2 for k in range(i)))
-L[i][j] = (A[i][j] - sum(L[i][k] * L[j][k] for k in range(i))) / L[i][i] for j > i
+L[i][j] = (A[i][j] - sum(L[i][k] * L[j][k] for k in range(i))) / L[i][i] for i > j
 ```
 Where:
 - `L[i][i]` is the diagonal element of `L`.
