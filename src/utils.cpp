@@ -11,10 +11,7 @@
 
 #include <cstdlib>
 #include <cassert>
-
-#include "../include/heat.h"
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 
 #include "../include/heat.h"
@@ -88,4 +85,3 @@ void field_write(field *heat, int iter)
     save_png(inner_data.data(), heat->nx, heat->ny, filename, 'c');
 #endif //HAVE_PNG
 }
-

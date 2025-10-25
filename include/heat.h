@@ -40,7 +40,7 @@ void initialize(int argc, char *argv[], field *heat1,
 
 void evolve(field *curr, field *prev, double a, double dt);
 
-void evolve_tiled(field *curr, field *prev, double a, double dt);
+void evolve_tiled(field *curr, field *prev, double a, double dt, int tile_i = 32, int tile_j = 32);
 
 void field_set_size(field *heat, int nx, int ny);
 

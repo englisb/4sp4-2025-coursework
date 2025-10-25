@@ -18,7 +18,6 @@ SHAREDDIR=/home/coe4sp4/
 
 cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${SHAREDDIR}/libpfm4/ -DPROFILING_ENABLED=ON
 cmake --build $(pwd)/build -- -j8
-make -j8
 
 
 
@@ -39,8 +38,8 @@ echo "---- Plotting ----"
 # create python virtual environment
 python3 -m venv $(pwd)/venv
 source $(pwd)/venv/bin/activate
-pip install -r $(pwd)/script/requirements.txt
+pip install numpy matplotlib
 mkdir -p $(pwd)/plots
 
 python3 $(pwd)/script/plot.py $(pwd)/logs/lab02-part1.json
-# TODO add more plotting commands
+python3 $(pwd)/script/plot.py $(pwd)/logs/lab02-part2.json
