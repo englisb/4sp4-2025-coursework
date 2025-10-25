@@ -233,9 +233,11 @@ Typically there is no single correct answer/plot for the following questions. Re
 
 ### Plot(s) 1: Cache Hierarchy Experiment
 
-![Figure 1: Cache Throughput Analysis](plots/plot1_cache_throughput.png)
+![Figure 1: Cache Throughput Analysis](plots/plot1.png)
 
 Description: This plot would demonstrate memory bandwidth vs array size to identify cache levels through throughput measurements. Currently not implemented as Part 1 benchmarks (BM_COPY) are marked as "SKIPPED: Not implemented yet". The experiment would measure copy performance across different array sizes to identify L1 (48KB), L2 (3MB), and L3 (30MB) cache boundaries through bandwidth changes and latency spikes at cache transitions.
+
+Based on the cache hierarchy analysis graphs, your benchmark results demonstrate a clear performance degradation pattern that reveals the critical impact of cache boundaries on application performance. The time per operation graph shows a stair-step pattern where performance remains relatively stable for small arrays that fit in L1 cache, but experiences jumps at cache boundaries. The time per operation then has a steep incline after the l3 boundary as the array exceeds all the cache levels and has to now excess main memory. It is again noticed in the below graph which looks at the bandwidth and it mirrors the patter where there are sharp increases at the cache boundaries. It then also plummets when reaching main memory as before we were increasing due to taking advantage of the cache lines to take advantage of the throughput which is why we see the increase and when its passed the boundary it collapses.
 
 ### Plot(s) 2: Heat Equation Performance Analysis
 
