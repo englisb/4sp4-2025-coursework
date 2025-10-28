@@ -8,6 +8,10 @@
 #ifndef LAB03_CHOLESKY_H
 #define LAB03_CHOLESKY_H
 
+#ifdef USE_MKL
+#include <mkl.h>
+#endif
+
 namespace swiftware::hpp
 {
 
@@ -18,6 +22,12 @@ namespace swiftware::hpp
 
   // In-place blocked Cholesky decomposition similar to LAPACK's DPOTRF
   void cholesky_decomposition_blocked_inplace(double **A, int n, int lda, int blockSize);
+
+#ifdef USE_MKL
+  // see here for details: https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2023-2/potrf.html
+  int cholesky_decomposition_mkl(double *A, int n);
+#endif
+
 }
 
 #endif //LAB03_CHOLESKY_H
