@@ -11,7 +11,8 @@
 # Above are SLURM directives for job scheduling on a cluster,
 export SLURM_CONF=/etc/slurm/slurm.conf
 
-
+# Source Intel MKL environment
+source /opt/intel/oneapi/setvars.sh --force
 
 echo "----- Building -----"
 # Do not change below, it is fixed folder everyone
