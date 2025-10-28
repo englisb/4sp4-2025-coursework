@@ -165,7 +165,7 @@ as it reduces the number of memory accesses and improves cache performance.
 L should overwrite the input matrix A. This is important to be compatible with the 
 Basic Linear Algebra Subprograms (BLAS) standard. 
 
-
+**Note** You can enable MKL implementation using `-DUSE_MKL=ON` when calling `cmake`.
 
 
 ### Task 2 : N-body Simulation

@@ -7,7 +7,7 @@
 
 
 #include <cmath>
-
+#include "cholesky.h"
 namespace swiftware::hpp{
 
   void cholesky_decomposition(double **A, double **L, int n) {
@@ -18,5 +18,12 @@ namespace swiftware::hpp{
     // TODO: Implement the vectorized Cholesky decomposition using AVX
   }
 
+#ifdef USE_MKL
+  int cholesky_decomposition_mkl(double *A, int n) {
+    // call chol from mkl
+    auto info = LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', n, A, n);
+    return info;
+  }
+#endif
 
 }

@@ -56,6 +56,12 @@ FetchContent_MakeAvailable(googlebenchmark)
 set(BENCHMARK_ENABLE_TESTS ON)
 set(BENCHMARK_ENABLE_GTEST_TESTS ON)
 
+# Find Intel MKL
+option(USE_MKL "Use Intel MKL for reference implementations" OFF)
+if(USE_MKL)
+    find_package(MKL CONFIG REQUIRED)
+    message(STATUS "MKL found: ${MKL_ROOT}")
+endif()
 
 include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -70,6 +76,9 @@ add_executable(lab03
 target_link_libraries(lab03
         benchmark::benchmark
 )
-
+if(USE_MKL)
+    target_link_libraries(lab03 MKL::MKL)
+    target_compile_definitions(lab03 PRIVATE USE_MKL)
+endif()
 add_subdirectory(test)
 
