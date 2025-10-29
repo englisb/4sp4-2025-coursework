@@ -13,6 +13,8 @@ export SLURM_CONF=/etc/slurm/slurm.conf
 
 # Source Intel MKL environment
 source /opt/intel/oneapi/setvars.sh --force
+export MKL_NUM_THREADS=1
+export MKL_DOMAIN_ALL=1
 
 echo "----- Building -----"
 # Do not change below, it is fixed folder everyone
