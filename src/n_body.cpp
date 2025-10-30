@@ -100,35 +100,80 @@ void swiftware::hpp::run_simulation(std::vector<swiftware::hpp::Particle> &parti
 // TODO: vectorized versions of your defined functions for N-Body simulation
 
   void generate_random_particles_vectorized(std::vector<Particle>& particles, int N,  unsigned int seed=10) {
-      srand(seed);
-      particles.resize(N);
+    particles.resize(N);
 
-      __m512d x = _mm512_setzero_pd();
-      __m512d y = _mm512_setzero_pd();
-      __m512d vx = _mm512_setzero_pd();
-      __m512d vy = _mm512_setzero_pd();
-      __m512d mass = _mm512_setzero_pd();
+    #ifdef USE_MKL
+        // Use Intel MKL's VSL for vectorized random number generation
+        VSLStreamStatePtr stream;
+        vslNewStream(&stream, VSL_BRNG_MT19937, seed);
+        
+        std::vector<double> rand_buffer(N * 5); // x, y, vx, vy, mass
+        vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, N * 5, rand_buffer.data(), 0.0, 1.0);
+        
+        for (int i = 0; i < N; ++i) {
+            particles[i].x = rand_buffer[i * 5 + 0] * 100.0;
+            particles[i].y = rand_buffer[i * 5 + 1] * 100.0;
+            particles[i].vx = rand_buffer[i * 5 + 2] * 1.0;
+            particles[i].vy = rand_buffer[i * 5 + 3] * 1.0;
+            particles[i].mass = rand_buffer[i * 5 + 4] * 10.0 + 1.0;
+        }
+        
+        vslDeleteStream(&stream);
+    #else
+    // Fallback to manual AVX vectorization with scalar rand()
+    srand(seed);
+    __m256d scale_100 = _mm256_set1_pd(100.0);
+    __m256d scale_1 = _mm256_set1_pd(1.0);
+    __m256d scale_10 = _mm256_set1_pd(10.0);
+    __m256d rand_max_inv = _mm256_set1_pd(1.0 / RAND_MAX);
 
+    int i = 0;
+    for (; i + 4 <= N; i += 4) {
+        double rand_x[4], rand_y[4], rand_vx[4], rand_vy[4], rand_mass[4];
+        for (int k = 0; k < 4; ++k) {
+            rand_x[k] = static_cast<double>(rand());
+            rand_y[k] = static_cast<double>(rand());
+            rand_vx[k] = static_cast<double>(rand());
+            rand_vy[k] = static_cast<double>(rand());
+            rand_mass[k] = static_cast<double>(rand());
+        }
 
-    for (int i = 0; i < 8; ++i) {
-      for (int j = 0; j < i * 64; ++j) {
-          rand_scaled_512 = rand();
+        __m256d x_vec = _mm256_loadu_pd(rand_x);
+        __m256d y_vec = _mm256_loadu_pd(rand_y);
+        __m256d vx_vec = _mm256_loadu_pd(rand_vx);
+        __m256d vy_vec = _mm256_loadu_pd(rand_vy);
+        __m256d mass_vec = _mm256_loadu_pd(rand_mass);
 
-          x = static_cast<double>(rand()) / RAND_MAX * 100.0;
-          y = static_cast<double>(rand()) / RAND_MAX * 100.0;
-          vx = static_cast<double>(rand()) / RAND_MAX * 1.0;
-          vy = static_cast<double>(rand()) / RAND_MAX * 1.0;
-          mass = static_cast<double>(rand()) / RAND_MAX * 10.0 + 1.0; // Avoid zero mass
+        x_vec = _mm256_mul_pd(_mm256_mul_pd(x_vec, rand_max_inv), scale_100);
+        y_vec = _mm256_mul_pd(_mm256_mul_pd(y_vec, rand_max_inv), scale_100);
+        vx_vec = _mm256_mul_pd(_mm256_mul_pd(vx_vec, rand_max_inv), scale_1);
+        vy_vec = _mm256_mul_pd(_mm256_mul_pd(vy_vec, rand_max_inv), scale_1);
+        mass_vec = _mm256_add_pd(_mm256_mul_pd(_mm256_mul_pd(mass_vec, rand_max_inv), scale_10), scale_1);
+
+        double x_out[4], y_out[4], vx_out[4], vy_out[4], mass_out[4];
+        _mm256_storeu_pd(x_out, x_vec);
+        _mm256_storeu_pd(y_out, y_vec);
+        _mm256_storeu_pd(vx_out, vx_vec);
+        _mm256_storeu_pd(vy_out, vy_vec);
+        _mm256_storeu_pd(mass_out, mass_vec);
+
+        for (int k = 0; k < 4; ++k) {
+            particles[i + k].x = x_out[k];
+            particles[i + k].y = y_out[k];
+            particles[i + k].vx = vx_out[k];
+            particles[i + k].vy = vy_out[k];
+            particles[i + k].mass = mass_out[k];
+        }
     }
 
-    // Assign generated values to particles
-    for (int i = 0; i < N; ++i) {
-        particles[i].x = x[i];
-        particles[i].y = y[i];
-        particles[i].vx = vx[i];
-        particles[i].vy = vy[i];
-        particles[i].mass = mass[i];
+    for (; i < N; ++i) {
+        particles[i].x = static_cast<double>(rand()) / RAND_MAX * 100.0;
+        particles[i].y = static_cast<double>(rand()) / RAND_MAX * 100.0;
+        particles[i].vx = static_cast<double>(rand()) / RAND_MAX * 1.0;
+        particles[i].vy = static_cast<double>(rand()) / RAND_MAX * 1.0;
+        particles[i].mass = static_cast<double>(rand()) / RAND_MAX * 10.0 + 1.0;
     }
+#endif
   }
 
   void calculate_forces_vectorized(std::vector<swiftware::hpp::Particle>& particles, std::vector<double>& fx, std::vector<double>& fy) {
