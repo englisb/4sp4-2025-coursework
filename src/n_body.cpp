@@ -9,6 +9,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <immintrin.h>
 
 #include "n_body.h"
 
@@ -98,6 +99,97 @@ void swiftware::hpp::run_simulation(std::vector<swiftware::hpp::Particle> &parti
 
 // TODO: vectorized versions of your defined functions for N-Body simulation
 
+  void generate_random_particles_vectorized(std::vector<Particle>& particles, int N,  unsigned int seed=10) {
+      srand(seed);
+      particles.resize(N);
+
+      __m512d x = _mm512_setzero_pd();
+      __m512d y = _mm512_setzero_pd();
+      __m512d vx = _mm512_setzero_pd();
+      __m512d vy = _mm512_setzero_pd();
+      __m512d mass = _mm512_setzero_pd();
 
 
+    for (int i = 0; i < 8; ++i) {
+      for (int j = 0; j < i * 64; ++j) {
+          rand_scaled_512 = rand();
 
+          x = static_cast<double>(rand()) / RAND_MAX * 100.0;
+          y = static_cast<double>(rand()) / RAND_MAX * 100.0;
+          vx = static_cast<double>(rand()) / RAND_MAX * 1.0;
+          vy = static_cast<double>(rand()) / RAND_MAX * 1.0;
+          mass = static_cast<double>(rand()) / RAND_MAX * 10.0 + 1.0; // Avoid zero mass
+    }
+
+    // Assign generated values to particles
+    for (int i = 0; i < N; ++i) {
+        particles[i].x = x[i];
+        particles[i].y = y[i];
+        particles[i].vx = vx[i];
+        particles[i].vy = vy[i];
+        particles[i].mass = mass[i];
+    }
+  }
+
+  void calculate_forces_vectorized(std::vector<swiftware::hpp::Particle>& particles, std::vector<double>& fx, std::vector<double>& fy) {
+      const double G = 6.67430e-11; // Gravitational constant
+      int N = particles.size();
+
+      // Reset forces for this time step
+      std::fill(fx.begin(), fx.end(), 0.0);
+      std::fill(fy.begin(), fy.end(), 0.0);
+
+      // Vectorized force calculation
+      for (int i = 0; i < N; ++i) {
+          for (int j = i + 1; j < N; ++j) {
+              double dx = particles[j].x - particles[i].x;
+              double dy = particles[j].y - particles[i].y;
+              double dist_sq = dx * dx + dy * dy;
+              double dist = std::sqrt(dist_sq);
+
+              // Avoid division by zero for particles at the same position
+              if (dist < 1e-4) continue;
+
+              double force = G * particles[i].mass * particles[j].mass / dist_sq;
+
+              fx[i] += force * dx / dist;
+              fy[i] += force * dy / dist;
+
+              fx[j] -= force * dx / dist;
+              fy[j] -= force * dy / dist;
+          }
+      }
+  }
+
+  void update_positions_vectorized(std::vector<Particle>& particles, const std::vector<double>& fx, const std::vector<double>& fy, double dt) {
+      int N = particles.size();
+      for (int i = 0; i < N; ++i) {
+          double ax = fx[i] / particles[i].mass;
+          double ay = fy[i] / particles[i].mass;
+
+          // Update velocity (using Euler for simplicity)
+          particles[i].vx += ax * dt;
+          particles[i].vy += ay * dt;
+
+          // Update position
+          particles[i].x += particles[i].vx * dt;
+          particles[i].y += particles[i].vy * dt;
+      }
+  }
+
+  void run_simulation_vectorized(std::vector<swiftware::hpp::Particle> &particles, int num_steps, double dt) {
+      const int N = particles.size();
+      std::vector<double> fx(N), fy(N);
+
+      // Main simulation loop
+      for (int step = 0; step < num_steps; ++step) {
+          calculate_forces_vectorized(particles, fx, fy);
+          update_positions_vectorized(particles, fx, fy, dt);
+
+          // Optional: print positions periodically
+          if (step % 50 == 0) {
+              std::cout << "Step " << step << ": Particle 0 position = ("
+                        << particles[0].x << ", " << particles[0].y << ")" << std::endl;
+          }
+      }
+  }

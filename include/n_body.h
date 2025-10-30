@@ -31,8 +31,15 @@ namespace swiftware::hpp
 
 
     /// TODO: define necessary functions for the vectorized version
+    void generate_random_particles_vectorized(std::vector<Particle>& particles, int N,  unsigned int seed=10);
 
+    // Function to calculate the gravitational force between two particles
+    void calculate_forces_vectorized(std::vector<swiftware::hpp::Particle>& particles, std::vector<double>& fx, std::vector<double>& fy);
 
+    // Function to update particle positions and velocities using Verlet integration
+    void update_positions_vectorized(std::vector<Particle>& particles, const std::vector<double>& fx, const std::vector<double>& fy, double dt);
+
+    void run_simulation_vectorized(std::vector<swiftware::hpp::Particle> &particles, int num_steps, double dt);
 
 }
 
