@@ -47,8 +47,8 @@ $(pwd)/build/nn_cpu --benchmark_out="$(pwd)/logs/nn_cpu.json" --benchmark_out_fo
 echo "---- Running GPU----"
 echo "Note. to run the GPU part, you will need to first enable GPU by add -DGPU_ENABLED=ON"
 
-$(pwd)/build/project_gpu --benchmark_out="$(pwd)/logs/project_gpu.json" --benchmark_out_format=json --benchmark_perf_counters="L1-dcache-loads"
-$(pwd)/build/nn_gpu --benchmark_out="$(pwd)/logs/nn_gpu.json" --benchmark_out_format=json
+$(pwd)/build/project_gpu --json "$(pwd)/logs/project_gpu.json" 
+$(pwd)/build/nn_gpu --json "$(pwd)/logs/nn_gpu.json" 
 
 
 
