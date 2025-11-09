@@ -184,7 +184,7 @@ void swiftware::hpp::calculate_forces_vectorized(std::vector<swiftware::hpp::Par
   std::fill(fx.begin(), fx.end(), 0.0);
   std::fill(fy.begin(), fy.end(), 0.0);
 
-  const int vec_length = 4; // AVX processes 4 doubles at a time
+  const int vec_length = 4; // AVX2 processes 4 doubles at a time
 
   __m256d G_vec = _mm256_set1_pd(G);
   __m256d eps_vec = _mm256_set1_pd(1e-4);
@@ -238,13 +238,12 @@ void swiftware::hpp::calculate_forces_vectorized(std::vector<swiftware::hpp::Par
 
         // Apply Newton's 3rd law to the j particles, per lane
         // Extract directional forces to apply to each j particle
-        double fx_tmp[4], fy_tmp[4];
-        _mm256_storeu_pd(fx_tmp, fx_vec);
-        _mm256_storeu_pd(fy_tmp, fy_vec);
-        for (int k = 0; k < vec_length; ++k) {
-          fx[j + k] -= fx_tmp[k];
-          fy[j + k] -= fy_tmp[k];
-        }
+        __m256d fxj_vec = _mm256_loadu_pd(&fx[j]);
+        __m256d fyj_vec = _mm256_loadu_pd(&fy[j]);
+        fxj_vec = _mm256_sub_pd(fxj_vec, fx_vec);
+        fyj_vec = _mm256_sub_pd(fyj_vec, fy_vec);
+        _mm256_storeu_pd(&fx[j], fxj_vec);
+        _mm256_storeu_pd(&fy[j], fyj_vec);
     }
     
     // Handle remaining particles
@@ -269,8 +268,54 @@ void swiftware::hpp::calculate_forces_vectorized(std::vector<swiftware::hpp::Par
 }
 
 void swiftware::hpp::update_positions_vectorized(std::vector<Particle>& particles, const std::vector<double>& fx, const std::vector<double>& fy, double dt) {
-    int N = particles.size();
-    for (int i = 0; i < N; ++i) {
+    int N = particles.size(), i;
+
+    const int vec_length = 4; // AVX2 processes 4 doubles at a time
+
+    for (i = 0; i + vec_length <= N; i += vec_length) {
+        __m256d fx_vec = _mm256_set_pd(fx[i + 3], fx[i + 2], fx[i + 1], fx[i]);
+        __m256d fy_vec = _mm256_set_pd(fy[i + 3], fy[i + 2], fy[i + 1], fy[i]);
+        __m256d mass_vec = _mm256_set_pd(particles[i + 3].mass, particles[i + 2].mass, particles[i + 1].mass, particles[i].mass);
+        __m256d dt_vec = _mm256_set1_pd(dt);
+
+        __m256d ax_vec = _mm256_div_pd(fx_vec, mass_vec);
+        __m256d ay_vec = _mm256_div_pd(fy_vec, mass_vec);
+
+        __m256d vx_vec = _mm256_set_pd(particles[i + 3].vx, particles[i + 2].vx, particles[i + 1].vx, particles[i].vx);
+        __m256d vy_vec = _mm256_set_pd(particles[i + 3].vy, particles[i + 2].vy, particles[i + 1].vy, particles[i].vy);
+        __m256d x_vec = _mm256_set_pd(particles[i + 3].x, particles[i + 2].x, particles[i + 1].x, particles[i].x);
+        __m256d y_vec = _mm256_set_pd(particles[i + 3].y, particles[i + 2].y, particles[i + 1].y, particles[i].y);
+
+        // Update velocities: v_new = v_old + a * dt
+        vx_vec = _mm256_add_pd(vx_vec, _mm256_mul_pd(ax_vec, dt_vec));
+        vy_vec = _mm256_add_pd(vy_vec, _mm256_mul_pd(ay_vec, dt_vec));
+        
+        // Update positions: x_new = x_old + v_new * dt
+        x_vec = _mm256_add_pd(x_vec, _mm256_mul_pd(vx_vec, dt_vec));
+        y_vec = _mm256_add_pd(y_vec, _mm256_mul_pd(vy_vec, dt_vec));
+
+        // Manually scatter results back to interleaved struct layout
+        double vx_out[4], vy_out[4], x_out[4], y_out[4];
+        _mm256_storeu_pd(vx_out, vx_vec);
+        _mm256_storeu_pd(vy_out, vy_vec);
+        _mm256_storeu_pd(x_out, x_vec);
+        _mm256_storeu_pd(y_out, y_vec);
+
+        particles[i + 0].vx = vx_out[0]; particles[i + 0].vy = vy_out[0];
+        particles[i + 0].x = x_out[0]; particles[i + 0].y = y_out[0];
+        
+        particles[i + 1].vx = vx_out[1]; particles[i + 1].vy = vy_out[1];
+        particles[i + 1].x = x_out[1]; particles[i + 1].y = y_out[1];
+        
+        particles[i + 2].vx = vx_out[2]; particles[i + 2].vy = vy_out[2];
+        particles[i + 2].x = x_out[2]; particles[i + 2].y = y_out[2];
+        
+        particles[i + 3].vx = vx_out[3]; particles[i + 3].vy = vy_out[3];
+        particles[i + 3].x = x_out[3]; particles[i + 3].y = y_out[3];
+    }
+
+    // Scalar tail
+    for (; i < N; ++i) {
         double ax = fx[i] / particles[i].mass;
         double ay = fy[i] / particles[i].mass;
 

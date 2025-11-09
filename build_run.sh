@@ -36,6 +36,7 @@ $(pwd)/build/lab03 --benchmark_out="$(pwd)/logs/lab03.json" --benchmark_out_form
 echo "---- Running Tests ----"
 
 $(pwd)/build/test/cholesky_test
+$(pwd)/build/test/nbody_test
 
 
 
