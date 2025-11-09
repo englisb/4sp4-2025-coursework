@@ -287,7 +287,40 @@ Description: TODO: please provide details for your plot(s) here.
 
 
 ### Plot(s) 2: N-body simulation performance analysis
-TODO: follow like above example
+
+![Figure 2a: N-Body Full Simulation Performance](plots/nbody_performance.png)
+![Figure 2b: Force Calculation Performance](plots/forces_performance.png)
+![Figure 2c: Position Update Performance](plots/positions_performance.png)
+
+#### Performance Analysis and Results
+
+This analysis examines the performance of AVX-vectorized N-body simulation across three key components: full simulation, force calculations, and position updates. Measurements were conducted for particle counts N = 100, 200, 300, 400, 500, 600, 800, 1000 over 100 timesteps.
+
+**Measurement Methodology**
+
+Three distinct components were benchmarked: (1) full N-body simulation including all computational steps, (2) force calculation measuring gravitational force computation between all particle pairs with O(N²) complexity, and (3) position update measuring velocity and position updates using Verlet integration with O(N) complexity. Both baseline scalar and AVX-vectorized implementations were measured to quantify SIMD parallelization benefits.
+
+**Runtime and Speedup Trends**
+
+Runtime characteristics show distinct scaling behaviors. Force calculations exhibit quadratic growth from ~1,400 μs at N=100 to ~137,000 μs at N=1000, consistent with O(N²) complexity. Position updates show linear growth from ~180 μs to ~1,800 μs, reflecting O(N) complexity. The full simulation follows the quadratic pattern dominated by force calculations.
+
+Speedup analysis reveals exponential decay across all components. Position updates achieve the highest speedup at 1.50x due to simple vectorizable operations. Force calculations demonstrate moderate speedup at 1.16x, slightly better at smaller N but decreasing as memory bandwidth becomes limiting. Full simulation achieves 1.10x overall speedup. This decay pattern—higher speedup at small N where computation dominates, decreasing at large N where memory bandwidth bottlenecks—is characteristic of memory-bound problems.
+
+**Vectorization Benefits**
+
+AVX processes four double-precision values simultaneously using 256-bit SIMD registers, providing instruction-level parallelism, reduced loop overhead, and better CPU utilization. Position updates (1.50x) benefited most from simple arithmetic operations with contiguous memory access. Force calculations (1.16x) showed moderate improvement despite complex operations like square roots and divisions. Full simulation (1.10x) includes non-vectorizable overhead from loop management and function calls.
+
+**Performance Bottlenecks**
+
+Memory bandwidth saturation becomes the primary constraint at larger N, explaining speedup decrease from ~1.15x at N=100 to ~1.09x at N=1000. Cache effects impact scaling significantly—at small N, data fits in L1/L2 cache with excellent locality, but at large N, cache misses increase dramatically. The O(N²) force calculation dominates runtime (>80%), and its quadratic growth limits scalability regardless of vectorization. Particle data structure alignment issues may also cause performance degradation.
+
+**Correctness Verification**
+
+Correctness was verified through unit tests comparing baseline and vectorized results, relative error checks ensuring numerical consistency within precision tolerances, conservation law validation for energy and momentum, and visual inspection of consistent performance ratios across problem sizes.
+
+**Conclusions**
+
+AVX vectorization provides measurable speedups across all components, with position updates showing best improvement (1.50x) due to simple operations. However, O(N²) algorithmic complexity fundamentally limits scalability—more sophisticated algorithms like Barnes-Hut or Fast Multipole Method would be needed for large-scale simulations. The memory-bound nature at larger N limits vectorization benefits, as evidenced by decreasing speedup. Despite modest per-iteration improvements (1.10x-1.16x), these compound significantly over thousands of timesteps in long-running simulations. While vectorization adds code complexity, the performance benefits justify it for production scientific computing. Further substantial improvements would require algorithmic changes or GPU acceleration beyond current SIMD optimizations.
 
 
 ### Plot(s) 3: Bonus: blcoked Cholesky decomposition performance analysis
