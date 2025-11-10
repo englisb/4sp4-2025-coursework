@@ -281,13 +281,17 @@ Typically there is no single correct answer/plot for the following questions. Re
 
 TODO: make sure to reference the correct plot below
 
-![Figure 1: Standard Sort Algorithm Complexity](plots/plot1.png)
 
 Description: TODO: please provide details for your plot(s) here.
 
 
 ### Plot(s) 2: N-body simulation performance analysis
-TODO: follow like above example
+
+![Figure 2a: N-Body Full Simulation Performance](plots/nbody_performance.png)
+![Figure 2b: Force Calculation Performance](plots/forces_performance.png)
+![Figure 2c: Position Update Performance](plots/positions_performance.png)
+
+In the N-Body simulation, each particle interacts with every other particles in the code, and this leads to a computational complexity of O(N^2). The vectorized implementation is using AVX intrinsics to compute multiple force components in parallel, which helps reduce arithmetic latency and also loop overhead. Performance was measured for N = 100 to 1000 over 100 timesteps, with separate benchmarks for the full simulation, force calculation, and position update. Runtime analysis show us that the force computations dominate and scale quadratically, while it is positioning updates scale linearly. Vectorization is achieved up to 1.50x speedup in position updates and approx. 1.10× overall in the full simulation, with diminishing gains at higher N due to cache and memory-bandwidth limits. The improvement comes from SIMD parallelism using 256 bit AVX registers that perform four double precision operations simultaneously, with FMA instructions that reduce instruction count and enhance numerical precision. Performance efficiency decreases beyond N approx. 800 as data no longer fits in cache, causing bandwidth saturation. Correctness was checked by matching vectorized results to the baseline within floating point tolerance. Overall, AVX vectorization significantly reduces per iteration runtime and also improves computational efficiency for mid sized simulations, however the scalability remains bounded by the O(N^2).
 
 
 ### Plot(s) 3: Bonus: blcoked Cholesky decomposition performance analysis
