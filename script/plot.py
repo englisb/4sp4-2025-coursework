@@ -91,6 +91,10 @@ def plot_google_benchmark_median(json_path):
     if positions_baseline and positions_vectorized:
         plot_positions_comparison(positions_baseline, positions_vectorized)
 
+    # Plot 5: Cholesky Performance Comparison
+    if cholesky_baseline and cholesky_vectorized:
+        plot_cholesky_performance(cholesky_baseline, cholesky_vectorized)
+
 def plot_nbody_comparison(baseline_dict, vectorized_dict):
     """Plot N-body baseline vs vectorized performance comparison with speedup"""
     fig, ax1 = plt.subplots(figsize=(10, 6))
@@ -325,4 +329,4 @@ def plot_cholesky_performance(baseline_data, vectorized_data):
     print(f"✓ Cholesky plot saved: Average speedup of {avg_speedup:.2f}x across matrix sizes")
 
 # Example usage: the input should stay the same. The output plot should be saved in the plots folder.
-plot_google_benchmark_median("./logs/lab02.json")
+plot_google_benchmark_median("./logs/lab03.json")
