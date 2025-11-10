@@ -343,15 +343,39 @@ def plot_cholesky_performance(baseline_data, vectorized_data):
     plt.savefig("./plots/cholesky_gflops.png", dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Calculate average speedup and peak GFLOP/s
-    avg_speedup = np.mean([baseline_medians[i] / vectorized_medians[i] 
-                          for i in range(min(len(baseline_medians), len(vectorized_medians)))])
+    # Calculate speedups for each size
+    speedups = [baseline_medians[i] / vectorized_medians[i] 
+                for i in range(min(len(baseline_medians), len(vectorized_medians)))]
+    
+    # Figure 3: Speedup
+    plt.figure(figsize=(10, 6))
+    plt.plot(baseline_sizes, speedups, '^-', 
+            label='Vectorized vs Baseline', 
+            linewidth=2, markersize=8, color='#2ecc71')
+    
+    # Add horizontal line at y=1 to show baseline reference
+    plt.axhline(y=1.0, color='gray', linestyle='--', alpha=0.5)
+    
+    plt.ylabel("Speedup Factor (×)", fontsize=12)
+    plt.xlabel("Matrix Size", fontsize=12)
+    plt.title("Cholesky Decomposition: Vectorization Speedup", fontsize=14)
+    plt.legend(fontsize=11)
+    plt.grid(True, alpha=0.3, linestyle='--')
+    plt.tight_layout()
+    plt.savefig("./plots/cholesky_speedup.png", dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Calculate statistics
+    avg_speedup = np.mean(speedups)
+    peak_speedup = max(speedups)
     peak_base_gflops = max(baseline_gflops)
     peak_vec_gflops = max(vectorized_gflops)
     
     print("✓ Cholesky plots saved:")
-    print(f"  - Average speedup: {avg_speedup:.2f}x across matrix sizes")
-    print(f"  - Peak performance (GFLOP/s):")
+    print(f"  - Speedup analysis:")
+    print(f"    * Average: {avg_speedup:.2f}×")
+    print(f"    * Peak:   {peak_speedup:.2f}× (at n={baseline_sizes[speedups.index(peak_speedup)]})")
+    print("  - Peak performance (GFLOP/s):")
     print(f"    * Baseline:   {peak_base_gflops:.1f}")
     print(f"    * Vectorized: {peak_vec_gflops:.1f}")
 
