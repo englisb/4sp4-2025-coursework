@@ -87,7 +87,7 @@ def plot_google_benchmark_median(json_path):
     if forces_baseline and forces_vectorized:
         plot_forces_comparison(forces_baseline, forces_vectorized)
     
-    # Plot 3: Position Update Performance Comparison
+    # Plot 4: Position Update Performance Comparison
     if positions_baseline and positions_vectorized:
         plot_positions_comparison(positions_baseline, positions_vectorized)
 

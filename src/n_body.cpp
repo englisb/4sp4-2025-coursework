@@ -97,7 +97,7 @@ void swiftware::hpp::run_simulation(std::vector<swiftware::hpp::Particle> &parti
 }
 
 
-// TODO: vectorized versions of your defined functions for N-Body simulation
+// Vectorized versions of N-Body simulation functions
 
 void swiftware::hpp::generate_random_particles_vectorized(std::vector<Particle>& particles, int N,  unsigned int seed) {
   particles.resize(N);

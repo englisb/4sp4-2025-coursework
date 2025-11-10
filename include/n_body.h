@@ -30,7 +30,7 @@ namespace swiftware::hpp
     void run_simulation(std::vector<swiftware::hpp::Particle> &particles, int num_steps, double dt);
 
 
-    /// TODO: define necessary functions for the vectorized version
+    // Vectorized versions using AVX intrinsics
     void generate_random_particles_vectorized(std::vector<Particle>& particles, int N,  unsigned int seed=10);
 
     // Function to calculate the gravitational force between two particles
