@@ -279,8 +279,11 @@ Typically there is no single correct answer/plot for the following questions. Re
 
 ### Plot(s) 1: Cholesky decomposition performance analysis
 
-TODO: make sure to reference the correct plot below
+![Figure 1a: Cholesky Decomposition: Runtime Scaling](plots/cholesky_runtime.png)
+![Figure 1b: Cholesky Decomposition: Computational Throughput](plots/cholesky_gflops.png)
+![Figure 1c: Cholesky Decomposition: Vectorization Speedup](plots/cholesky_speedup.png)
 
+The above graphs show a performance comparison of Cholesky Decomposition with baseline sequential and a vectorized implementation. The vectorized implementation makes use of SIMD instructions allowing the cpu to process 4 elements in parallel per instruction. We can see the impact of this in our Runtime graph where the baseline always has higher execution time across all matrix sizes. In addition, we also notice a patter where the execution time of the baseline vs vectorized has a higher difference as the matrix size increases. This is because the role parallelism has a more profound impact as its able to process more elements and this is shown in the Gflops graph where the vectorized implementation is always higher than baseline. We see in the Gflops graph that there is a peak around 120-150 matrix size and then the Gflop decays this is because of cache sizes as the l1 and l2 caches are filling up. We can improve this by doing a blocked implementation which will improve cache locality and reduce memory stalls. We can see the impact of this in the speedup graph as the slope of the curve becomes smaller as matrix size increases which means less relative increase in speedup.
 
 Description: TODO: please provide details for your plot(s) here.
 
