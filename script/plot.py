@@ -91,6 +91,10 @@ def plot_google_benchmark_median(json_path):
     if positions_baseline and positions_vectorized:
         plot_positions_comparison(positions_baseline, positions_vectorized)
 
+    # Plot 5: Cholesky Performance Comparison
+    if cholesky_baseline and cholesky_vectorized:
+        plot_cholesky_performance(cholesky_baseline, cholesky_vectorized)
+
 def plot_nbody_comparison(baseline_dict, vectorized_dict):
     """Plot N-body baseline vs vectorized performance comparison with speedup"""
     fig, ax1 = plt.subplots(figsize=(10, 6))
@@ -278,9 +282,7 @@ def plot_positions_comparison(baseline_dict, vectorized_dict):
     print(f"✓ Position update plot saved: Vectorized implementation achieves {avg_speedup:.2f}x average speedup over baseline")
 
 def plot_cholesky_performance(baseline_data, vectorized_data):
-    """Plot Cholesky performance vs matrix size"""
-    plt.figure(figsize=(12, 7))
-    
+    """Plot Cholesky performance vs matrix size and GFLOP/s as separate figures"""
     # Sort by matrix size and calculate medians for each size
     baseline_dict = {}
     vectorized_dict = {}
@@ -304,25 +306,78 @@ def plot_cholesky_performance(baseline_data, vectorized_data):
     vectorized_sizes = sorted(vectorized_dict.keys())
     vectorized_medians = [np.median(vectorized_dict[s]) for s in vectorized_sizes]
     
-    # Plot lines
+    # Figure 1: Runtime scaling
+    plt.figure(figsize=(10, 6))
     plt.plot(baseline_sizes, baseline_medians, 'o-', label='Baseline', 
-             linewidth=2, markersize=8, color='#3498db')
+            linewidth=2, markersize=8, color='#3498db')
     plt.plot(vectorized_sizes, vectorized_medians, 's-', label='Vectorized (AVX)', 
-             linewidth=2, markersize=8, color='#e74c3c')
+            linewidth=2, markersize=8, color='#e74c3c')
     
     plt.ylabel("Execution Time (μs)", fontsize=12)
     plt.xlabel("Matrix Size", fontsize=12)
-    plt.title("Cholesky Decomposition: Performance Scaling", fontsize=14)
+    plt.title("Cholesky Decomposition: Runtime Scaling", fontsize=14)
     plt.legend(fontsize=11)
     plt.grid(True, alpha=0.3, linestyle='--')
     plt.tight_layout()
-    plt.savefig("./plots/cholesky_performance.png", dpi=300)
+    plt.savefig("./plots/cholesky_runtime.png", dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Calculate average speedup
-    avg_speedup = np.mean([baseline_medians[i] / vectorized_medians[i] 
-                           for i in range(min(len(baseline_medians), len(vectorized_medians)))])
-    print(f"✓ Cholesky plot saved: Average speedup of {avg_speedup:.2f}x across matrix sizes")
+    # Calculate GFLOP/s
+    # Cholesky requires n³/3 FLOPs for n×n matrix
+    baseline_gflops = [(size**3/3) / (1e3 * time) for size, time in zip(baseline_sizes, baseline_medians)]
+    vectorized_gflops = [(size**3/3) / (1e3 * time) for size, time in zip(vectorized_sizes, vectorized_medians)]
+    
+    # Figure 2: GFLOP/s
+    plt.figure(figsize=(10, 6))
+    plt.plot(baseline_sizes, baseline_gflops, 'o-', label='Baseline', 
+            linewidth=2, markersize=8, color='#3498db')
+    plt.plot(vectorized_sizes, vectorized_gflops, 's-', label='Vectorized (AVX)', 
+            linewidth=2, markersize=8, color='#e74c3c')
+    
+    plt.ylabel("Performance (GFLOP/s)", fontsize=12)
+    plt.xlabel("Matrix Size", fontsize=12)
+    plt.title("Cholesky Decomposition: Computational Throughput", fontsize=14)
+    plt.legend(fontsize=11)
+    plt.grid(True, alpha=0.3, linestyle='--')
+    plt.tight_layout()
+    plt.savefig("./plots/cholesky_gflops.png", dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Calculate speedups for each size
+    speedups = [baseline_medians[i] / vectorized_medians[i] 
+                for i in range(min(len(baseline_medians), len(vectorized_medians)))]
+    
+    # Figure 3: Speedup
+    plt.figure(figsize=(10, 6))
+    plt.plot(baseline_sizes, speedups, '^-', 
+            label='Vectorized vs Baseline', 
+            linewidth=2, markersize=8, color='#2ecc71')
+    
+    # Add horizontal line at y=1 to show baseline reference
+    plt.axhline(y=1.0, color='gray', linestyle='--', alpha=0.5)
+    
+    plt.ylabel("Speedup Factor (×)", fontsize=12)
+    plt.xlabel("Matrix Size", fontsize=12)
+    plt.title("Cholesky Decomposition: Vectorization Speedup", fontsize=14)
+    plt.legend(fontsize=11)
+    plt.grid(True, alpha=0.3, linestyle='--')
+    plt.tight_layout()
+    plt.savefig("./plots/cholesky_speedup.png", dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Calculate statistics
+    avg_speedup = np.mean(speedups)
+    peak_speedup = max(speedups)
+    peak_base_gflops = max(baseline_gflops)
+    peak_vec_gflops = max(vectorized_gflops)
+    
+    print("✓ Cholesky plots saved:")
+    print(f"  - Speedup analysis:")
+    print(f"    * Average: {avg_speedup:.2f}×")
+    print(f"    * Peak:   {peak_speedup:.2f}× (at n={baseline_sizes[speedups.index(peak_speedup)]})")
+    print("  - Peak performance (GFLOP/s):")
+    print(f"    * Baseline:   {peak_base_gflops:.1f}")
+    print(f"    * Vectorized: {peak_vec_gflops:.1f}")
 
 # Example usage: the input should stay the same. The output plot should be saved in the plots folder.
-plot_google_benchmark_median("./logs/lab02.json")
+plot_google_benchmark_median("./logs/lab03.json")
