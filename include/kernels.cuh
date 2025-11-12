@@ -13,25 +13,25 @@ namespace swiftware::hpp
 {
 
     // GEMM kernel
-    __global__ void MM(const float* a, const float* b, float* result, int n)
+    __global__ void MM(const float* a, const float* b, float* result, int m, int n, int k)
     {
         // TODO
     }
 
     // GEMV
-    __global__ void MV(const float* a, const float* b, float* result, int n)
+    __global__ void MV(const float* a, const float* b, float* result, int m, int n)
     {
         // TODO
     }
 
     // SpMM
-    __global__ void SpMM(int *row_ptr, int *col_id, const float* a, const float* b, float* result, int n)
+    __global__ void SpMM(int *row_ptr, int *col_id, const float* a, const float* b, float* result, int m, int n, int k)
     {
         // TODO
     }
 
     // SpMV
-    __global__ void SpMV(int *row_ptr, int *col_id, const float* a, const float* b, float* result, int n)
+    __global__ void SpMV(int *row_ptr, int *col_id, const float* a, const float* b, float* result, int m, int n)
     {
         // TODO
     }
