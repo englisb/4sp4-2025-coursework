@@ -116,8 +116,42 @@ void nvbench_mulAdd_v2(nvbench::state& state)
 // TODO: add nvbench_mulAdd_v3
 void nvbench_mulAdd_v3(nvbench::state& state)
 {
-  // TODO: add your benchmarking code here
+  const size_t n = static_cast<size_t>(state.get_int64("n"));
+  std::vector<float> A(n), B(n), Out(n), Ref(n);
+  swiftware::hpp::generate_random_float_arrays(A.data(), B.data(), Out.data(), Ref.data(), n);
+
+  float *d_a = nullptr, *d_b = nullptr, *d_out = nullptr;
+  swiftware::hpp::allocate_and_copy_to_device(A.data(), B.data(), Out.data(), &d_a, &d_b, &d_out, n);
+
+  const int block = 256;
+  const int grid = static_cast<int>((n + block * 4 - 1) / (block * 4));  // 4 elements per thread
+
+  state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
+    CUDA_CHECK(cudaMemcpyAsync(d_out, Out.data(), n * sizeof(float), cudaMemcpyHostToDevice, launch.get_stream()));
+    // start timer
+    timer.start();
+    swiftware::hpp::mulAddKernel_v3<float><<<grid, block, 0, launch.get_stream()>>>(d_a, d_b, d_out, n);
+    // stop timer
+    timer.stop();
+  });
+
+  std::vector<float> out_host(n);
+  CUDA_CHECK(cudaMemcpy(out_host.data(), d_out, n * sizeof(float), cudaMemcpyDeviceToHost));
+
+  // compare to Ref with small epsilon
+  const float eps = 1e-5f;
+  for (size_t i = 0; i < n; ++i) {
+    if (std::fabs(out_host[i] - Ref[i]) > eps) {
+      std::fprintf(stderr, "Mismatch at %zu: got %f expected %f\n", i, out_host[i], Ref[i]);
+      std::abort();
+    }
+  }
+
+  swiftware::hpp::free_buffers(d_a, d_b, d_out);
+
+  report_summary(state);
 }
 
 NVBENCH_BENCH(nvbench_mulAdd_v1).set_name("mulAdd_v1").add_int64_axis("n", {1<<10, 1<<15, 1<<20, 1<<25});
 NVBENCH_BENCH(nvbench_mulAdd_v2).set_name("mulAdd_v2").add_int64_axis("n", {1<<10, 1<<15, 1<<20, 1<<25});
+NVBENCH_BENCH(nvbench_mulAdd_v3).set_name("mulAdd_v3").add_int64_axis("n", {1<<10, 1<<15, 1<<20, 1<<25});

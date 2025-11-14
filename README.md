@@ -125,7 +125,7 @@ Typically there is no single correct answer/plot for the following questions. Re
 
 TODO: make sure to reference the correct plot below
 
-![Figure 1: ](plots/plot1.png)
+![Figure 1: ](plots/combined_metrics.png)
 
 Description: TODO: please provide details for your plot(s) here.
 

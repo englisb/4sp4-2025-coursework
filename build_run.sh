@@ -18,14 +18,14 @@ echo "---- Running tut02 ----"
 $(pwd)/build/tut02 --json tut02_results.json
 
 echo "---- Testing  ----"
-$(pwd)/build/test/vec_op_test
+$(pwd)/build/test/muladd_op_test
 
  
 echo "---- Profiling with Nsight Compute ----"
 mkdir -p $HOME/tmp
 export TMPDIR=$HOME/tmp
 mkdir -p $(pwd)/logs
-ncu --set full -o $(pwd)/logs/ncu_profile $(pwd)/build/tut02 --profile
+ncu --set full -o "$(pwd)/logs/ncu_profile" -f $(pwd)/build/tut02 --profile
 
 echo "---- Extracting NCU results to CSV ----"
 ncu --import $(pwd)/logs/ncu_profile.ncu-rep --csv > $(pwd)/logs/ncu_results.csv
