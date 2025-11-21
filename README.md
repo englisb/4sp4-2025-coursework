@@ -174,7 +174,14 @@ Description: TODO: please provide details for your plot(s) here.
 
 
 ### Plot(s) 2: GPU SpTRSV performance analysis
-TODO: follow like above example
+
+![Figure 2a: GPU vs cuSPARSE Performance Comparison](plots/task2_gpu_comparison.png)
+
+![Figure 2b: GPU Speedup Analysis](plots/task2_gpu_speedup.png)
+
+![Figure 2c: GPU Performance Scaling](plots/task2_gpu_scaling.png)
+
+Description: Our custom CUDA kernel achieves 6.6x to 86.7x speedup (average 28.8x) over cuSPARSE across all test matrices. The single-pass parallel design with wavefront synchronization efficiently handles row dependencies, maintaining sub-millisecond execution times even for matrices with 135k+ non-zeros. Matrices with diagonal dominance like apache2 (86.7x speedup) benefit most, while denser dependency structures like minsurfo (6.6x speedup) show more modest gains.
 
 
 ### Plot(s) 3: Bonus: performance comparison with MKL and cusparse

@@ -52,7 +52,40 @@ namespace swiftware::hpp {
   template<typename T>
   CSR<T> COO_to_CSR(const Matrix<T> &coo_matrix) {
     CSR<T> csr_matrix;
-    // TODO : implement the conversion from COO to CSR
+    csr_matrix.rows = coo_matrix.rows;
+    csr_matrix.cols = coo_matrix.cols;
+    csr_matrix.non_zeros = coo_matrix.non_zeros;
+    csr_matrix.type = coo_matrix.type;
+
+    // Initialize row_pointer array (size = rows + 1)
+    csr_matrix.row_pointer.resize(coo_matrix.rows + 1, 0);
+    csr_matrix.col_indices.reserve(coo_matrix.non_zeros);
+    csr_matrix.values.reserve(coo_matrix.non_zeros);
+
+    // Count non-zeros per row
+    for (int i = 0; i < coo_matrix.non_zeros; ++i) {
+      csr_matrix.row_pointer[coo_matrix.row_indices[i] + 1]++;
+    }
+
+    // Cumulative sum to get row pointers
+    for (int i = 0; i < coo_matrix.rows; ++i) {
+      csr_matrix.row_pointer[i + 1] += csr_matrix.row_pointer[i];
+    }
+
+    // Temporary array to track current position for each row
+    std::vector<int> row_counters = csr_matrix.row_pointer;
+    csr_matrix.col_indices.resize(coo_matrix.non_zeros);
+    csr_matrix.values.resize(coo_matrix.non_zeros);
+
+    // Fill col_indices and values arrays
+    for (int i = 0; i < coo_matrix.non_zeros; ++i) {
+      int row = coo_matrix.row_indices[i];
+      int dest = row_counters[row];
+      csr_matrix.col_indices[dest] = coo_matrix.col_indices[i];
+      csr_matrix.values[dest] = coo_matrix.values[i];
+      row_counters[row]++;
+    }
+
     return csr_matrix;
   }
 
@@ -178,7 +211,22 @@ namespace swiftware::hpp {
     throw std::runtime_error("File format error: Dimensions line not found.");
   }
 
-  // TODO : implement necessary function
+  template<typename T>
+  void build_rhs_for_triangular_solve(const CSR<T>& csr_matrix, std::vector<T>& rhs, std::vector<T>& expected_solution) {
+    // Build RHS vector such that solution is all ones
+    // For Lx = b, if x = [1, 1, ..., 1], then b = L * x
+    int n = csr_matrix.rows;
+    expected_solution.resize(n, 1.0);
+    rhs.resize(n, 0.0);
+    
+    for (int i = 0; i < n; ++i) {
+      T sum = 0.0;
+      for (int j = csr_matrix.row_pointer[i]; j < csr_matrix.row_pointer[i + 1]; ++j) {
+        sum += csr_matrix.values[j] * expected_solution[csr_matrix.col_indices[j]];
+      }
+      rhs[i] = sum;
+    }
+  }
 
 
   template<typename T>

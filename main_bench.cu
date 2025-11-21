@@ -68,29 +68,57 @@ void nvbench_sptrsv(nvbench::state& state)
   std::vector<double> solution(n, 0.0f);
   auto SP = swiftware::hpp::ScheduleParams(-1, -1, 20, 1);
 
-  // TODO : add necessary function to allocate memory and copy it to device
+  // Build RHS vector for triangular solve (solution should be all ones)
+  std::vector<double> expected_solution;
+  swiftware::hpp::build_rhs_for_triangular_solve(csr_matrix, rhs, expected_solution);
 
+  // Allocate device memory
+  double *d_val = nullptr;
+  int *d_col_ind = nullptr;
+  int *d_row_ptr = nullptr;
+  double *d_x = nullptr;
+  double *d_b = nullptr;
+  int *d_wave = nullptr;
 
+  size_t nnz = csr_matrix.values.size();
+  CUDA_CHECK(cudaMalloc(&d_val, nnz * sizeof(double)));
+  CUDA_CHECK(cudaMalloc(&d_col_ind, nnz * sizeof(int)));
+  CUDA_CHECK(cudaMalloc(&d_row_ptr, (n + 1) * sizeof(int)));
+  CUDA_CHECK(cudaMalloc(&d_x, n * sizeof(double)));
+  CUDA_CHECK(cudaMalloc(&d_b, n * sizeof(double)));
+  CUDA_CHECK(cudaMalloc(&d_wave, n * sizeof(int)));
 
+  // Copy data to device
+  CUDA_CHECK(cudaMemcpy(d_val, csr_matrix.values.data(), nnz * sizeof(double), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_col_ind, csr_matrix.col_indices.data(), nnz * sizeof(int), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_row_ptr, csr_matrix.row_pointer.data(), (n + 1) * sizeof(int), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_b, rhs.data(), n * sizeof(double), cudaMemcpyHostToDevice));
 
+  // Launch configuration
+  int threadsPerBlock = 256;
+  int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
 
-  state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
+  state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch){
+    // Initialize solution vector to zero
+    CUDA_CHECK(cudaMemset(d_x, 0, n * sizeof(double)));
 
-    // start timer, launch SPTRSV kernel, stop timer
-    timer.start();
-
-      ///swiftware::hpp::sparse_csr_parallel_gpu<double>;
-
-    timer.stop();
+    // Single kernel launch - the kernel will be called once per benchmark iteration
+    swiftware::hpp::sparse_csr_parallel_gpu<double><<<blocksPerGrid, threadsPerBlock>>>(
+      d_val, d_col_ind, d_row_ptr, d_x, d_b, n, d_wave
+    );
   });
 
-// TODO : ensure device work finished, copy solution back and free device memory
+  // Ensure device work finished and copy solution back
+  CUDA_CHECK(cudaDeviceSynchronize());
+  CUDA_CHECK(cudaMemcpy(solution.data(), d_x, n * sizeof(double), cudaMemcpyDeviceToHost));
 
-
-  //TODO:  test the solution vector to be all ones
-
-
-  report_summary(state);
+  // Free device memory
+  CUDA_CHECK(cudaFree(d_val));
+  CUDA_CHECK(cudaFree(d_col_ind));
+  CUDA_CHECK(cudaFree(d_row_ptr));
+  CUDA_CHECK(cudaFree(d_x));
+  CUDA_CHECK(cudaFree(d_b));
+  CUDA_CHECK(cudaFree(d_wave));
 }
 
 
@@ -131,8 +159,21 @@ void nvbench_sptrsv_cusparse(nvbench::state& state)
   size_t col_size = csr_matrix.col_indices.size();
   size_t row_ptr_size = csr_matrix.row_pointer.size();
 
-  // TODO allocate and copy data to device
+  // Build RHS vector
+  std::vector<double> expected_solution;
+  swiftware::hpp::build_rhs_for_triangular_solve(csr_matrix, rhs, expected_solution);
 
+  // Allocate and copy data to device
+  CUDA_CHECK(cudaMalloc(&d_values, nnz * sizeof(double)));
+  CUDA_CHECK(cudaMalloc(&d_col, col_size * sizeof(int)));
+  CUDA_CHECK(cudaMalloc(&d_row, row_ptr_size * sizeof(int)));
+  CUDA_CHECK(cudaMalloc(&d_rhs, n * sizeof(double)));
+  CUDA_CHECK(cudaMalloc(&d_solution, n * sizeof(double)));
+
+  CUDA_CHECK(cudaMemcpy(d_values, csr_matrix.values.data(), nnz * sizeof(double), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_col, csr_matrix.col_indices.data(), col_size * sizeof(int), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_row, csr_matrix.row_pointer.data(), row_ptr_size * sizeof(int), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_rhs, rhs.data(), n * sizeof(double), cudaMemcpyHostToDevice));
 
   cusparseHandle_t cusparse;
   cusparseCreate(&cusparse);
