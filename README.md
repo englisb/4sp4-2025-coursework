@@ -174,7 +174,16 @@ Description: TODO: please provide details for your plot(s) here.
 
 
 ### Plot(s) 2: GPU SpTRSV performance analysis
-TODO: follow like above example
+
+![Figure 2a: GPU Runtime Comparison](plots/task2_gpu_comparison.png)
+
+![Figure 2b: GPU Speedup Analysis](plots/task2_gpu_speedup.png)
+
+![Figure 2c: GPU Runtime Scaling](plots/task2_gpu_scaling.png)
+
+**Description:**
+
+The level-set GPU implementation separates scheduling time (level-set computation measured with `std::chrono` outside benchmarking) from solve time (GPU kernel execution measured inside `state.exec()`), achieving 4x-201x speedup vs CPU sequential that varies by matrix dependency structure—apache2 (201x, 664 levels) and minsurfo (21x, 505 levels) exhibit high parallelism due to sparse dependencies, while 1138_bus (4x, 21 levels) and crystm01 (4x, 117 levels) show limited speedup from dense dependency chains forcing near-sequential execution. Accumulated time analysis (scheduling + solve) confirms preprocessing overhead is negligible (<0.1ms for small matrices, 7.5ms for apache2), with solve time dominating overall performance. Speedup variation directly correlates with matrix structure: sparse dependencies enable parallel level execution while dense dependencies create bottlenecks, and cuSPARSE's 2-50x advantage over our implementation stems from optimized memory coalescing and single kernel launches rather than fundamental algorithmic differences.
 
 
 ### Plot(s) 3: Bonus: performance comparison with MKL and cusparse

@@ -38,15 +38,21 @@ static void BM_SPTRSV(benchmark::State &state) {
     // build rhs
     int n = matrix.cols;
     std::vector<double> rhs(n);
+    std::vector<double> expected_solution;
+    swiftware::hpp::build_rhs_for_triangular_solve(csr_matrix, rhs, expected_solution);
+    
     // Allocate memory for the solution vector
     std::vector<double> solution(n, 0.0f);
     auto SP = swiftware::hpp::ScheduleParams(-1, -1, 10, 1);
 
     for (auto _: state) {
+        std::fill(solution.begin(), solution.end(), 0.0);
         // Running the triangular solver
         swiftware::hpp::sptrsv_csr<double>(csr_matrix.values.data(), csr_matrix.col_indices.data(), csr_matrix.row_pointer.data(), solution.data(), rhs.data(), n, &SP);
+        // Prevent compiler from optimizing away the computation
+        benchmark::DoNotOptimize(solution.data());
+        benchmark::ClobberMemory();
     }
-    // test the solution vector to be all ones
 
 }
 
