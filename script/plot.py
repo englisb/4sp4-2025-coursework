@@ -1,6 +1,7 @@
 import json
 import matplotlib.pyplot as plt
 import os
+from typing import Dict, List, Tuple
 
 def plot_google_benchmark_median(json_path):
     # TODO: open the json/csv file and do necessary processing to plot what is needed.

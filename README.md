@@ -166,11 +166,21 @@ Typically there is no single correct answer/plot for the following questions. Re
 
 ### Plot(s) 1: Parallel multicore SpTRSV performance analysis
 
-TODO: make sure to reference the correct plot below
+Plots:
+![Figure 1a: Seq vs OpenMP](plots/sptrsv_seq_vs_omp.png)
+![Figure 1b: Speedup (Seq/OMP)](plots/sptrsv_speedup.png)
+![Figure 1c: Thread Scaling Runtime](plots/sptrsv_omp_thread_scaling.png)
+![Figure 1d: Thread Scaling Speedup](plots/sptrsv_omp_speedup_threads.png)
+![Figure 1e: Level-Set Mean Time by Matrix](plots/levelset_mean_time_by_matrix.png)
+![Figure 1f: Level-Set Mean Time by Threads](plots/levelset_mean_time_by_threads.png)
 
-![Figure 1: ](plots/plot1.png)
+Description: The sequential solver consistently outperforms the OpenMP implementation across all four test matrices. The plots use median run times reported by Google Benchmark in microseconds. The best OpenMP configuration for every matrix is one thread, and increasing the thread count monotonically increases runtime while decreasing the speedup ratio below one.
 
-Description: TODO: please provide details for your plot(s) here.
+This performance degradation occurs because the level-set parallelization approach introduces substantial overhead that the available parallel work cannot offset. Computing the dependency levels and entering OpenMP parallel regions adds fixed costs to every solve. Each matrix contains between one hundred and six hundred levels, and each level requires a barrier synchronization. These barriers multiply the per-level overhead, and many levels have limited width, leaving threads idle at barriers with minimal useful work per level.
+
+The implementation uses adaptive scheduling that switches between static, dynamic, and guided policies based on level size characteristics. Static scheduling applies to well-balanced levels with chunk sizes proportional to level width divided by thread count. Dynamic scheduling handles medium-sized levels with smaller chunks. Guided scheduling manages the remaining cases with exponentially decreasing chunk sizes. Despite this adaptive approach, the dependency structure of these matrices limits exploitable parallelism, and the runtime overhead grows with thread count rather than improving it.
+
+Therefore, for these particular sparse triangular systems, the OpenMP parallel solver is slower than the optimized sequential baseline. The overhead from level-set construction, barrier synchronization, and parallel region management dominates the per-row computation time, and this effect worsens as more threads are added.
 
 
 ### Plot(s) 2: GPU SpTRSV performance analysis
