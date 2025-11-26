@@ -16,13 +16,14 @@ namespace swiftware::hpp {
   struct ScheduleParams {
     int NumThreads;
     int ChunkSize;
-    // TODO: Add more parameters if needed
     int TileSize1;
     int TileSize2;
     int NumWF;
     std::vector<int> WFPointer, WFIterations;
+    std::vector<double> level_times;
+    bool collect_level_times;
     ScheduleParams(int TileSize1, int TileSize2, int NT, int CS):
-      TileSize1(TileSize1), TileSize2(TileSize2), NumThreads(NT), ChunkSize(CS){}
+      TileSize1(TileSize1), TileSize2(TileSize2), NumThreads(NT), ChunkSize(CS), collect_level_times(false){}
   };
 
   // please do not change below lines
