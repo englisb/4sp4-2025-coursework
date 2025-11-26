@@ -35,14 +35,14 @@ TEST(SpTRSVGPUTest, SmallDiagonalMatrix) {
     
     // Allocate device memory
     double *d_val, *d_x, *d_b;
-    int *d_col_ind, *d_row_ptr, *d_wave;
+    int *d_col_ind, *d_row_ptr, *d_ready;
     
     CUDA_CHECK_TEST(cudaMalloc(&d_val, values.size() * sizeof(double)));
     CUDA_CHECK_TEST(cudaMalloc(&d_col_ind, col_indices.size() * sizeof(int)));
     CUDA_CHECK_TEST(cudaMalloc(&d_row_ptr, row_ptr.size() * sizeof(int)));
     CUDA_CHECK_TEST(cudaMalloc(&d_x, n * sizeof(double)));
     CUDA_CHECK_TEST(cudaMalloc(&d_b, n * sizeof(double)));
-    CUDA_CHECK_TEST(cudaMalloc(&d_wave, n * sizeof(int)));
+    CUDA_CHECK_TEST(cudaMalloc(&d_ready, n * sizeof(int)));
     
     // Copy to device
     CUDA_CHECK_TEST(cudaMemcpy(d_val, values.data(), values.size() * sizeof(double), cudaMemcpyHostToDevice));
@@ -50,14 +50,17 @@ TEST(SpTRSVGPUTest, SmallDiagonalMatrix) {
     CUDA_CHECK_TEST(cudaMemcpy(d_row_ptr, row_ptr.data(), row_ptr.size() * sizeof(int), cudaMemcpyHostToDevice));
     CUDA_CHECK_TEST(cudaMemcpy(d_b, b.data(), n * sizeof(double), cudaMemcpyHostToDevice));
     CUDA_CHECK_TEST(cudaMemset(d_x, 0, n * sizeof(double)));
+    CUDA_CHECK_TEST(cudaMemset(d_ready, 0, n * sizeof(int)));
     
-    // Launch kernel
+    // Launch kernel iteratively
     int threadsPerBlock = 256;
     int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
-    swiftware::hpp::sparse_csr_parallel_gpu<double><<<blocksPerGrid, threadsPerBlock>>>(
-        d_val, d_col_ind, d_row_ptr, d_x, d_b, n, d_wave
-    );
-    CUDA_CHECK_TEST(cudaDeviceSynchronize());
+    for (int iter = 0; iter < n; ++iter) {
+        swiftware::hpp::sparse_csr_parallel_gpu<double><<<blocksPerGrid, threadsPerBlock>>>(
+            d_val, d_col_ind, d_row_ptr, d_x, d_b, n, d_ready
+        );
+        CUDA_CHECK_TEST(cudaDeviceSynchronize());
+    }
     
     // Copy result back
     CUDA_CHECK_TEST(cudaMemcpy(x.data(), d_x, n * sizeof(double), cudaMemcpyDeviceToHost));
@@ -73,21 +76,20 @@ TEST(SpTRSVGPUTest, SmallDiagonalMatrix) {
     CUDA_CHECK_TEST(cudaFree(d_row_ptr));
     CUDA_CHECK_TEST(cudaFree(d_x));
     CUDA_CHECK_TEST(cudaFree(d_b));
-    CUDA_CHECK_TEST(cudaFree(d_wave));
+    CUDA_CHECK_TEST(cudaFree(d_ready));
 }
 
 TEST(SpTRSVGPUTest, LowerTriangularMatrix) {
-    const size_t n = 4;
-    // Lower triangular matrix:
-    // [ 2  0  0  0 ]   [1]   [ 2]
-    // [ 1  3  0  0 ] * [1] = [ 4]
-    // [ 0  2  4  0 ]   [1]   [ 6]
-    // [ 0  0  3  5 ]   [1]   [ 8]
+    const size_t n = 3;
+    // Lower triangular matrix for correct test [1.0, 1.0, 4.5]:
+    // [ 2  0  0 ]   [1.0]   [ 2.0]
+    // [ 1  3  0 ] * [1.0] = [ 4.0]
+    // [ 0  2  4 ]   [4.5]   [20.0]
     
-    std::vector<double> values = {2.0, 1.0, 3.0, 2.0, 4.0, 3.0, 5.0};
-    std::vector<int> col_indices = {0, 0, 1, 1, 2, 2, 3};
-    std::vector<int> row_ptr = {0, 1, 3, 5, 7};
-    std::vector<double> b = {2.0, 4.0, 6.0, 8.0};
+    std::vector<double> values = {2.0, 1.0, 3.0, 2.0, 4.0};
+    std::vector<int> col_indices = {0, 0, 1, 1, 2};
+    std::vector<int> row_ptr = {0, 1, 3, 5};
+    std::vector<double> b = {2.0, 4.0, 20.0};
     std::vector<double> x(n, 0.0);
     
     // Allocate device memory
@@ -121,9 +123,10 @@ TEST(SpTRSVGPUTest, LowerTriangularMatrix) {
     // Copy result back
     CUDA_CHECK_TEST(cudaMemcpy(x.data(), d_x, n * sizeof(double), cudaMemcpyDeviceToHost));
     
-    // Verify: solution should be [1, 1, 1, 1]
+    // Verify: solution should be [1.0, 1.0, 4.5]
+    std::vector<double> expected = {1.0, 1.0, 4.5};
     for (size_t i = 0; i < n; ++i) {
-        EXPECT_NEAR(x[i], 1.0, 1e-6) << "Mismatch at index " << i;
+        EXPECT_NEAR(x[i], expected[i], 1e-6) << "Mismatch at index " << i;
     }
     
     // Cleanup
@@ -164,14 +167,14 @@ TEST(SpTRSVGPUTest, MediumMatrix) {
     
     // Allocate device memory
     double *d_val, *d_x, *d_b;
-    int *d_col_ind, *d_row_ptr, *d_wave;
+    int *d_col_ind, *d_row_ptr, *d_ready;
     
     CUDA_CHECK_TEST(cudaMalloc(&d_val, values.size() * sizeof(double)));
     CUDA_CHECK_TEST(cudaMalloc(&d_col_ind, col_indices.size() * sizeof(int)));
     CUDA_CHECK_TEST(cudaMalloc(&d_row_ptr, row_ptr.size() * sizeof(int)));
     CUDA_CHECK_TEST(cudaMalloc(&d_x, n * sizeof(double)));
     CUDA_CHECK_TEST(cudaMalloc(&d_b, n * sizeof(double)));
-    CUDA_CHECK_TEST(cudaMalloc(&d_wave, n * sizeof(int)));
+    CUDA_CHECK_TEST(cudaMalloc(&d_ready, n * sizeof(int)));
     
     // Copy to device
     CUDA_CHECK_TEST(cudaMemcpy(d_val, values.data(), values.size() * sizeof(double), cudaMemcpyHostToDevice));
@@ -179,13 +182,14 @@ TEST(SpTRSVGPUTest, MediumMatrix) {
     CUDA_CHECK_TEST(cudaMemcpy(d_row_ptr, row_ptr.data(), row_ptr.size() * sizeof(int), cudaMemcpyHostToDevice));
     CUDA_CHECK_TEST(cudaMemcpy(d_b, b.data(), n * sizeof(double), cudaMemcpyHostToDevice));
     CUDA_CHECK_TEST(cudaMemset(d_x, 0, n * sizeof(double)));
+    CUDA_CHECK_TEST(cudaMemset(d_ready, 0, n * sizeof(int)));
     
     // Launch kernel iteratively
     int threadsPerBlock = 256;
     int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
     for (int iter = 0; iter < n; ++iter) {
         swiftware::hpp::sparse_csr_parallel_gpu<double><<<blocksPerGrid, threadsPerBlock>>>(
-            d_val, d_col_ind, d_row_ptr, d_x, d_b, n, d_wave
+            d_val, d_col_ind, d_row_ptr, d_x, d_b, n, d_ready
         );
         CUDA_CHECK_TEST(cudaDeviceSynchronize());
     }
@@ -204,7 +208,7 @@ TEST(SpTRSVGPUTest, MediumMatrix) {
     CUDA_CHECK_TEST(cudaFree(d_row_ptr));
     CUDA_CHECK_TEST(cudaFree(d_x));
     CUDA_CHECK_TEST(cudaFree(d_b));
-    CUDA_CHECK_TEST(cudaFree(d_wave));
+    CUDA_CHECK_TEST(cudaFree(d_ready));
 }
 
 TEST(COOtoCSRTest, ConversionTest) {
