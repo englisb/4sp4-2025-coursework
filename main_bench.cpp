@@ -56,7 +56,6 @@ static void BM_SPTRSV(benchmark::State &state) {
         swiftware::hpp::sptrsv_csr<double>(csr_matrix.values.data(), csr_matrix.col_indices.data(), csr_matrix.row_pointer.data(), solution.data(), rhs.data(), n, &SP);
         benchmark::DoNotOptimize(solution.data());
     }
-    // test the solution vector to be all ones
 
 }
 

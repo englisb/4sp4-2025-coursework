@@ -211,7 +211,22 @@ namespace swiftware::hpp {
     throw std::runtime_error("File format error: Dimensions line not found.");
   }
 
-  // TODO : implement necessary function
+  template<typename T>
+  void build_rhs_for_triangular_solve(const CSR<T>& csr_matrix, std::vector<T>& rhs, std::vector<T>& expected_solution) {
+    // Build RHS vector such that solution is all ones
+    // For Lx = b, if x = [1, 1, ..., 1], then b = L * x
+    int n = csr_matrix.rows;
+    expected_solution.resize(n, 1.0);
+    rhs.resize(n, 0.0);
+    
+    for (int i = 0; i < n; ++i) {
+      T sum = 0.0;
+      for (int j = csr_matrix.row_pointer[i]; j < csr_matrix.row_pointer[i + 1]; ++j) {
+        sum += csr_matrix.values[j] * expected_solution[csr_matrix.col_indices[j]];
+      }
+      rhs[i] = sum;
+    }
+  }
 
 
   template<typename T>
