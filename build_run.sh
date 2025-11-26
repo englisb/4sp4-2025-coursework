@@ -46,4 +46,5 @@ python3 -m venv $(pwd)/venv
 source $(pwd)/venv/bin/activate
 pip install -r $(pwd)/script/requirements.txt
 mkdir -p $(pwd)/plots
-python3 $(pwd)/script/plot.py $(pwd)/logs/lab04-cpu.json
+python3 $(pwd)/script/plot_parallel.py $(pwd)/logs/lab04-cpu.json
+python3 $(pwd)/script/plot_gpu.py $(pwd)/logs/lab04_gpu.json
