@@ -55,6 +55,72 @@ void nvbench_gemm(nvbench::state& state)
     report_summary(state);
 }
 
+void nvbench_gemv(nvbench::state& state)
+{
+    const size_t n = static_cast<size_t>(state.get_int64("n"));
+
+
+    const int block = 256;
+    const int grid = static_cast<int>((n + block - 1) / block);
+
+    state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
+        // start timer
+        timer.start();
+        // TODO: launch your  kernel here
+        // stop timer
+        timer.stop();
+    });
+
+
+    //TODO  compare to Ref with small epsilon
+
+    report_summary(state);
+}
+
+void nvbench_spmm(nvbench::state& state)
+{
+    const size_t n = static_cast<size_t>(state.get_int64("n"));
+
+
+    const int block = 256;
+    const int grid = static_cast<int>((n + block - 1) / block);
+
+    state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
+        // start timer
+        timer.start();
+        // TODO: launch your  kernel here
+        // stop timer
+        timer.stop();
+    });
+
+
+    //TODO  compare to Ref with small epsilon
+
+    report_summary(state);
+}
+
+void nvbench_gemv(nvbench::state& state)
+{
+    const size_t n = static_cast<size_t>(state.get_int64("n"));
+
+
+    const int block = 256;
+    const int grid = static_cast<int>((n + block - 1) / block);
+
+    state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
+        // start timer
+        timer.start();
+        // TODO: launch your  kernel here
+        // stop timer
+        timer.stop();
+    });
+
+
+    //TODO  compare to Ref with small epsilon
+
+    report_summary(state);
+}
+
 
 NVBENCH_BENCH(nvbench_gemm).set_name("gemm").add_int64_axis("n", {1<<10, 1<<15, 1<<20, 1<<25});
 
