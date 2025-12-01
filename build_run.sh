@@ -55,6 +55,12 @@ $(pwd)/build/nn_gpu --json "$(pwd)/logs/nn_gpu.json"
 echo "---- Running Tests ----"
 
 $(pwd)/build/test/project_dense_nn_test
+$(pwd)/build/test/project_gemm_test
+$(pwd)/build/test/project_gemv_test
+$(pwd)/build/test/project_spmm_test
+$(pwd)/build/test/project_spmv_test
+$(pwd)/build/test/project_sparse_nn_test
+
 
 
 echo "---- Plotting ----"
