@@ -95,7 +95,8 @@ def plot_gemm(records):
     plt.figure(figsize=(12,6))
     bars = plt.bar(labels, med_times, color=['#444' if 'baseline' in lbl else '#1f77b4' for lbl in labels])
     plt.ylabel('Median Time (µs)')
-    plt.xlabel('ProblemSize-Tile')
+    plt.yscale('log')
+    plt.xlabel('Problem - XTileSize x YTileSize')
     plt.title('GEMM Median Time vs Tile Size')
     plt.xticks(rotation=35, ha='right')
     # annotate speedup vs baseline of same size

@@ -171,24 +171,84 @@ BENCHMARK(BM_GEMM)
     ->Repetitions(10);
 
 BENCHMARK(BM_GEMM)
+    ->Args({64, 64, 64, 16, 16})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+BENCHMARK(BM_GEMM)
+    ->Args({64, 64, 64, 32, 32})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+BENCHMARK(BM_GEMM)
+    ->Args({64, 64, 64, 64, 64})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+BENCHMARK(BM_GEMM)
+    ->Args({128, 128, 128, -1, -1})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+BENCHMARK(BM_GEMM)
     ->Args({128, 128, 128, 16, 16})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
     ->Repetitions(10);
 
 BENCHMARK(BM_GEMM)
+    ->Args({128, 128, 128, 32, 32})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+BENCHMARK(BM_GEMM)
+    ->Args({128, 128, 128, 64, 64})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+BENCHMARK(BM_GEMM)
+    ->Args({128, 128, 128, 128, 128})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+BENCHMARK(BM_GEMM)
+    ->Args({256, 256, 256, -1, -1})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+    BENCHMARK(BM_GEMM)
     ->Args({256, 256, 256, 32, 32})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
     ->Repetitions(10);
 
 BENCHMARK(BM_GEMM)
+    ->Args({512, 512, 512, -1, -1})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+    BENCHMARK(BM_GEMM)
     ->Args({512, 512, 512, 64, 64})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
     ->Repetitions(10);
 
 BENCHMARK(BM_GEMM)
+    ->Args({1024, 1024, 1024, -1, -1})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(10);
+
+    BENCHMARK(BM_GEMM)
     ->Args({1024, 1024, 1024, 128, 128})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
