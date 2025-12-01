@@ -7,31 +7,26 @@
 
 #include "benchmark/benchmark.h"
 #include "dense_nn.h"
+#include "sparse_nn.h"
 #include "utils.h"
-#include <algorithm>
 
 static void BM_DENSENN(benchmark::State &state) {
   auto *mnistData = swiftware::hpp::readCSV("./data/mnist_train.csv", true);
+  auto *labels = new swiftware::hpp::DenseMatrix(mnistData->m, 1);
+  auto *features =
+      new swiftware::hpp::DenseMatrix(mnistData->m, mnistData->n - 1);
 
   // Extract labels and features from mnist dataset
-  // Labels are in the first column, features are in the rest
-  int numSamples = mnistData->m;
-  int numFeatures = mnistData->n - 1;
+  // Labels are in the first column, features are in the remaining columns
+  // Features need to be normalized to [0, 1] range (divide by 255.0)
+  for (int i = 0; i < mnistData->m; i++) {
+    // Extract label from first column
+    labels->data[i] = mnistData->data[i * mnistData->n + 0];
 
-  // Test only the first 10 samples
-  int testSamples = std::min(10, numSamples);
-
-  auto *labels = new swiftware::hpp::DenseMatrix(testSamples, 1);
-  auto *features = new swiftware::hpp::DenseMatrix(testSamples, numFeatures);
-
-  // Extract labels (first column) and features (remaining columns)
-  for (int i = 0; i < testSamples; i++) {
-    labels->data[i] =
-        mnistData->data[i * mnistData->n]; // First column is label
-    for (int j = 0; j < numFeatures; j++) {
-      // Normalize pixel values to [0, 1] range
-      features->data[i * numFeatures + j] =
-          mnistData->data[i * mnistData->n + j + 1] / 255.0f;
+    // Extract features from remaining columns
+    for (int j = 1; j < mnistData->n; j++) {
+      features->data[i * features->n + (j - 1)] =
+          mnistData->data[i * mnistData->n + j] / 255.0;
     }
   }
 
@@ -45,31 +40,31 @@ static void BM_DENSENN(benchmark::State &state) {
       swiftware::hpp::readCSV("./data/model/biases_output.csv");
   swiftware::hpp::ScheduleParams scheduleParams(state.range(0), state.range(1));
 
+  // Implement the benchmark
   int correctPredictions = 0;
-  double accuracy = 0.0;
+  // int totalSamples = features->m;
+  int totalSamples = 10;
 
   for (auto _ : state) {
-    // Running the NN function - use GEMM version
+    // Running the NN function
     auto *predictions = swiftware::hpp::dense_nn_gemm(
         features, weightsHidden, weightsOutput, biasesHidden, biasesOutput,
         scheduleParams);
 
+    // Calculate accuracy
     state.PauseTiming();
 
-    // Calculate accuracy
     correctPredictions = 0;
-    for (int i = 0; i < testSamples; i++) {
-      int predicted = static_cast<int>(predictions->data[i]);
-      int actual = static_cast<int>(labels->data[i]);
-      if (predicted == actual) {
+    for (int i = 0; i < totalSamples; i++) {
+      if (static_cast<int>(predictions->data[i]) ==
+          static_cast<int>(labels->data[i])) {
         correctPredictions++;
       }
     }
-    accuracy = (static_cast<double>(correctPredictions) / testSamples) * 100.0;
 
+    double accuracy =
+        (static_cast<double>(correctPredictions) / totalSamples) * 100.0;
     state.counters["Accuracy"] = accuracy;
-    state.counters["Correct"] = correctPredictions;
-    state.counters["Total"] = testSamples;
 
     delete predictions;
     state.ResumeTiming();
@@ -90,25 +85,69 @@ static void BM_SPARSENN(benchmark::State &state) {
   auto *features =
       new swiftware::hpp::DenseMatrix(mnistData->m, mnistData->n - 1);
 
-  // TODO: Extract labels and features from mnist dataset
+  // Extract labels and features from mnist dataset
+  // Labels are in the first column, features are in the remaining columns
+  // Features need to be normalized to [0, 1] range (divide by 255.0)
+  for (int i = 0; i < mnistData->m; i++) {
+    // Extract label from first column
+    labels->data[i] = mnistData->data[i * mnistData->n + 0];
 
-  // TODO : load sparse weights and convert to CSR format
+    // Extract features from remaining columns
+    for (int j = 1; j < mnistData->n; j++) {
+      features->data[i * features->n + (j - 1)] =
+          mnistData->data[i * mnistData->n + j] / 255.0;
+    }
+  }
 
-  // TODO : Implement the benchmark
+  // Load sparse weights and convert to CSR format
+  // Using 50% sparsity as an example (can be changed to other sparsity levels)
+  auto *weightsHiddenCSR =
+      swiftware::hpp::loadPrunedWeightsCSR("./data/model/50_W1.csv");
+  auto *weightsOutputCSR =
+      swiftware::hpp::loadPrunedWeightsCSR("./data/model/50_W2.csv");
+  auto *biasesHidden =
+      swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
+  auto *biasesOutput =
+      swiftware::hpp::readCSV("./data/model/biases_output.csv");
+  swiftware::hpp::ScheduleParams scheduleParams(state.range(0), state.range(1));
+
+  // Implement the benchmark
   int correctPredictions = 0;
+  // int totalSamples = features->m;
+  int totalSamples = 10;
 
   for (auto _ : state) {
-    // TODO Running the NN function
+    // Running the NN function (using SPMM version for batch processing)
+    auto *predictions = swiftware::hpp::sparseNNSpmm(
+        features, weightsHiddenCSR, weightsOutputCSR, biasesHidden,
+        biasesOutput, scheduleParams);
 
-    // TODO: Calculate accuracy
+    // Calculate accuracy
     state.PauseTiming();
 
+    correctPredictions = 0;
+    for (int i = 0; i < totalSamples; i++) {
+      if (static_cast<int>(predictions->data[i]) ==
+          static_cast<int>(labels->data[i])) {
+        correctPredictions++;
+      }
+    }
+
+    double accuracy =
+        (static_cast<double>(correctPredictions) / totalSamples) * 100.0;
+    state.counters["Accuracy"] = accuracy;
+
+    delete predictions;
     state.ResumeTiming();
   }
 
   delete mnistData;
   delete labels;
   delete features;
+  delete weightsHiddenCSR;
+  delete weightsOutputCSR;
+  delete biasesHidden;
+  delete biasesOutput;
 }
 
 // For baseline and simd where tile sizes are not used
@@ -116,6 +155,12 @@ BENCHMARK(BM_DENSENN)
     ->Args({32, 32})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
-    ->Repetitions(5);
+    ->Repetitions(1);
+
+BENCHMARK(BM_SPARSENN)
+    ->Args({32, 32})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(1);
 
 BENCHMARK_MAIN();

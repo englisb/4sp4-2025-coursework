@@ -50,7 +50,6 @@ if not os.path.exists(data_path):
 # Use pandas to read the CSV file
 data = pd.read_csv(data_path)
 
-# Preprocess Data using pandas operations
 # Labels are in the first column, features are in the rest
 labels_df = data.iloc[:, [0]]  # Keep as DataFrame first
 features_df = data.iloc[:, 1:]  # Keep as DataFrame
