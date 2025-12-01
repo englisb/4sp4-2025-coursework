@@ -13,6 +13,7 @@
 #include <cuda_runtime.h>
 #include "kernels.cuh"
 #include "gpu_utils.h"
+#include "include/gpu_dense_nn.cuh"
 
 
 #define CUDA_CHECK(x) swiftware::hpp::cuda_check((x), __FILE__, __LINE__)
@@ -40,11 +41,20 @@ void nvbench_gemm(nvbench::state& state)
 
     const int block = 256;
     const int grid = static_cast<int>((n + block - 1) / block);
+    auto *A = new swiftware::hpp::DenseMatrix(n, n);
+    auto *B = new swiftware::hpp::DenseMatrix(n, n);
+    auto *C = new swiftware::hpp::DenseMatrix(n, n);
+    // Allocate and initialize A, B, C on GPU
+    CUDA_CHECK(cudaMalloc((void**)&A, n * n * sizeof(float)));
+    CUDA_CHECK(cudaMalloc((void**)&B, n * n * sizeof(float)));
+    CUDA_CHECK(cudaMalloc((void**)&C, n * n * sizeof(float)));
+    // Initialize A and B with some values
+    // TODO: Initialize A and B with some values
 
     state.exec(nvbench::exec_tag::timer, [&](nvbench::launch& launch, auto& timer){
         // start timer
         timer.start();
-        // TODO: launch your  kernel here
+        gemm_gpu_baseline<<<grid, block>>>(n, n, n, A, B, C);
         // stop timer
         timer.stop();
     });
@@ -122,6 +132,7 @@ void nvbench_gemv(nvbench::state& state)
 }
 
 
-NVBENCH_BENCH(nvbench_gemm).set_name("gemm").add_int64_axis("n", {1<<10, 1<<15, 1<<20, 1<<25});
+NVBENCH_BENCH(nvbench_gemm).set_name("gemm").add_int64_power_of_two_axis("n", nvbench::range(4, 12, 2))
+                            .add_string_axis("GemmStrategy", {"BASELINE", "SHARED_MEMORY", "COALESCED_MEMORY", "COMBINED"});
 
 
