@@ -21,7 +21,14 @@ namespace swiftware::hpp
     /// \param B Matrix B
     /// \param C Matrix C
 
-    __global__ void gemm_gpu(int m, int n, int k, const float *A, const float *B, float *C);
+    enum class GemmStrategy;
+
+    __host__ void gemm_gpu(int m, int n, int k, const float *A, const float *B, float *C, GemmStrategy strategy);
+    __global__ void gemm_gpu_baseline(int m, int n, int k, const float *A, const float *B, float *C);
+    __global__ void gemm_gpu_shared(int m, int n, int k, const float *A, const float *B, float *C);
+    __global__ void gemm_gpu_coalesced(int m, int n, int k, const float *A, const float *B, float *C);
+    __global__ void gemm_gpu_combined(int m, int n, int k, const float *A, const float *B, float *C);
+
     __global__ void dense_nn_gpu(int batch_size, int input_size, int output_size,
                                  const float *input, const float *weights, const float *bias,
                                  float *output);
