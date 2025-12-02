@@ -5,139 +5,187 @@
 // Distribution of this code is not permitted in any form
 // without express written permission from SwiftWare Lab.
 
-#include "include/gpu_dense_nn.cuh"
+#include "gpu_dense_nn.cuh"
+#include "kernels.cuh"
+#include "gpu_utils.h"
+#include <cuda_runtime.h>
+#include <algorithm>
+
+#define CUDA_CHECK(x) swiftware::hpp::cuda_check((x), __FILE__, __LINE__)
 
 namespace swiftware::hpp {
-    enum class GemmStrategy {
-        BASELINE,           // Naive implementation
-        SHARED_MEMORY,      // Use shared memory tiling
-        COALESCED_MEMORY,   // Optimize memory access patterns
-        COMBINED            // Shared memory + coalesced access
-    };
 
-    // Baseline implementation (original)
-    __global__ void gemm_gpu_baseline(int m, int n, int k, const float *A, const float *B, float *C) {
-        int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        while(tid < m * n) {
-            int row = tid / n;
-            int col = tid % n;
-            float sum = 0.0f;
-            for (int p = 0; p < k; ++p) {
-                sum += A[row * k + p] * B[p * n + col];
-            }
-            C[row * n + col] += sum;
-            tid += blockDim.x * gridDim.x;
-        }
+DenseMatrix *gpu_dense_nn_gemm(DenseMatrix *InData, DenseMatrix *W1, DenseMatrix *W2, 
+                                DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp) {
+    int batchSize = InData->m;
+    int inputSize = InData->n;
+    int hiddenSize = W1->m;
+    int outputSize = W2->m;
+
+    // Allocate device memory
+    float *d_input, *d_W1, *d_W2, *d_B1, *d_B2, *d_H, *d_Z;
+    
+    CUDA_CHECK(cudaMalloc(&d_input, batchSize * inputSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_W1, hiddenSize * inputSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_W2, outputSize * hiddenSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_B1, hiddenSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_B2, outputSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_H, batchSize * hiddenSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_Z, batchSize * outputSize * sizeof(float)));
+
+    // Copy data to device
+    CUDA_CHECK(cudaMemcpy(d_input, InData->data.data(), batchSize * inputSize * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_W1, W1->data.data(), hiddenSize * inputSize * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_W2, W2->data.data(), outputSize * hiddenSize * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B1, B1->data.data(), hiddenSize * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B2, B2->data.data(), outputSize * sizeof(float), cudaMemcpyHostToDevice));
+
+    // Initialize H and Z to zero
+    CUDA_CHECK(cudaMemset(d_H, 0, batchSize * hiddenSize * sizeof(float)));
+    CUDA_CHECK(cudaMemset(d_Z, 0, batchSize * outputSize * sizeof(float)));
+
+    // Layer 1: H = tanh(X * W1^T + b1)
+    dim3 block(TILE_SIZE, TILE_SIZE);
+    dim3 grid1((hiddenSize + TILE_SIZE - 1) / TILE_SIZE, (batchSize + TILE_SIZE - 1) / TILE_SIZE);
+    MM<<<grid1, block>>>(d_input, d_W1, d_H, batchSize, hiddenSize, inputSize);
+    CUDA_CHECK(cudaGetLastError());
+
+    // Add bias
+    int threads = 256;
+    int blocks = (batchSize * hiddenSize + threads - 1) / threads;
+    add_bias_kernel<<<blocks, threads>>>(d_H, d_B1, batchSize, hiddenSize);
+    CUDA_CHECK(cudaGetLastError());
+
+    // Apply tanh
+    apply_tanh_kernel<<<blocks, threads>>>(d_H, batchSize * hiddenSize);
+    CUDA_CHECK(cudaGetLastError());
+
+    // Layer 2: Z = sigmoid(H * W2^T + b2)
+    dim3 grid2((outputSize + TILE_SIZE - 1) / TILE_SIZE, (batchSize + TILE_SIZE - 1) / TILE_SIZE);
+    MM<<<grid2, block>>>(d_H, d_W2, d_Z, batchSize, outputSize, hiddenSize);
+    CUDA_CHECK(cudaGetLastError());
+
+    // Add bias
+    blocks = (batchSize * outputSize + threads - 1) / threads;
+    add_bias_kernel<<<blocks, threads>>>(d_Z, d_B2, batchSize, outputSize);
+    CUDA_CHECK(cudaGetLastError());
+
+    // Apply sigmoid
+    apply_sigmoid_kernel<<<blocks, threads>>>(d_Z, batchSize * outputSize);
+    CUDA_CHECK(cudaGetLastError());
+
+    // Copy Z back to host for argmax
+    DenseMatrix *Z_host = new DenseMatrix(batchSize, outputSize);
+    CUDA_CHECK(cudaMemcpy(Z_host->data.data(), d_Z, batchSize * outputSize * sizeof(float), cudaMemcpyDeviceToHost));
+
+    // Argmax on device
+    DenseMatrix *pred = new DenseMatrix(batchSize, 1);
+    float *d_pred;
+    CUDA_CHECK(cudaMalloc(&d_pred, batchSize * sizeof(float)));
+    
+    blocks = (batchSize + threads - 1) / threads;
+    argmax_rows_kernel<<<blocks, threads>>>(d_Z, d_pred, batchSize, outputSize);
+    CUDA_CHECK(cudaGetLastError());
+
+    CUDA_CHECK(cudaMemcpy(pred->data.data(), d_pred, batchSize * sizeof(float), cudaMemcpyDeviceToHost));
+
+    // Free device memory
+    CUDA_CHECK(cudaFree(d_input));
+    CUDA_CHECK(cudaFree(d_W1));
+    CUDA_CHECK(cudaFree(d_W2));
+    CUDA_CHECK(cudaFree(d_B1));
+    CUDA_CHECK(cudaFree(d_B2));
+    CUDA_CHECK(cudaFree(d_H));
+    CUDA_CHECK(cudaFree(d_Z));
+    CUDA_CHECK(cudaFree(d_pred));
+    
+    delete Z_host;
+    
+    return pred;
+}
+
+DenseMatrix *gpu_dense_nn_gemv(DenseMatrix *InData, DenseMatrix *W1, DenseMatrix *W2, 
+                                DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp) {
+    int batchSize = InData->m;
+    int inputSize = InData->n;
+    int hiddenSize = W1->m;
+    int outputSize = W2->m;
+
+    DenseMatrix *pred = new DenseMatrix(batchSize, 1);
+
+    // Allocate device memory for weights and biases (reused for all samples)
+    float *d_W1, *d_W2, *d_B1, *d_B2, *d_input, *d_H, *d_Z;
+    
+    CUDA_CHECK(cudaMalloc(&d_W1, hiddenSize * inputSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_W2, outputSize * hiddenSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_B1, hiddenSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_B2, outputSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_input, inputSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_H, hiddenSize * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_Z, outputSize * sizeof(float)));
+
+    // Copy weights and biases to device
+    CUDA_CHECK(cudaMemcpy(d_W1, W1->data.data(), hiddenSize * inputSize * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_W2, W2->data.data(), outputSize * hiddenSize * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B1, B1->data.data(), hiddenSize * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B2, B2->data.data(), outputSize * sizeof(float), cudaMemcpyHostToDevice));
+
+    int threads = 256;
+
+    // Process each sample
+    for (int i = 0; i < batchSize; i++) {
+        // Copy input sample to device
+        CUDA_CHECK(cudaMemcpy(d_input, &InData->data[i * inputSize], inputSize * sizeof(float), cudaMemcpyHostToDevice));
+
+        // Initialize H and Z
+        CUDA_CHECK(cudaMemset(d_H, 0, hiddenSize * sizeof(float)));
+        CUDA_CHECK(cudaMemset(d_Z, 0, outputSize * sizeof(float)));
+
+        // Layer 1: H = tanh(W1 * x + b1)
+        int blocks = (hiddenSize + threads - 1) / threads;
+        MV<<<blocks, threads>>>(d_W1, d_input, d_H, hiddenSize, inputSize);
+        CUDA_CHECK(cudaGetLastError());
+
+        // Add bias
+        add_bias_kernel<<<blocks, threads>>>(d_H, d_B1, 1, hiddenSize);
+        CUDA_CHECK(cudaGetLastError());
+
+        // Apply tanh
+        apply_tanh_kernel<<<blocks, threads>>>(d_H, hiddenSize);
+        CUDA_CHECK(cudaGetLastError());
+
+        // Layer 2: Z = sigmoid(W2 * H + b2)
+        blocks = (outputSize + threads - 1) / threads;
+        MV<<<blocks, threads>>>(d_W2, d_H, d_Z, outputSize, hiddenSize);
+        CUDA_CHECK(cudaGetLastError());
+
+        // Add bias
+        add_bias_kernel<<<blocks, threads>>>(d_Z, d_B2, 1, outputSize);
+        CUDA_CHECK(cudaGetLastError());
+
+        // Apply sigmoid
+        apply_sigmoid_kernel<<<blocks, threads>>>(d_Z, outputSize);
+        CUDA_CHECK(cudaGetLastError());
+
+        // Argmax on device
+        float *d_pred;
+        CUDA_CHECK(cudaMalloc(&d_pred, sizeof(float)));
+        argmax_rows_kernel<<<1, 1>>>(d_Z, d_pred, 1, outputSize);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaMemcpy(&pred->data[i], d_pred, sizeof(float), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaFree(d_pred));
     }
 
-    // Shared memory tiling implementation
-    #define TILE_SIZE 16
-    __global__ void gemm_gpu_shared(int m, int n, int k, const float *A, const float *B, float *C) {
-        __shared__ float As[TILE_SIZE][TILE_SIZE];
-        __shared__ float Bs[TILE_SIZE][TILE_SIZE];
+    // Free device memory
+    CUDA_CHECK(cudaFree(d_W1));
+    CUDA_CHECK(cudaFree(d_W2));
+    CUDA_CHECK(cudaFree(d_B1));
+    CUDA_CHECK(cudaFree(d_B2));
+    CUDA_CHECK(cudaFree(d_input));
+    CUDA_CHECK(cudaFree(d_H));
+    CUDA_CHECK(cudaFree(d_Z));
 
-        int row = blockIdx.y * TILE_SIZE + threadIdx.y;
-        int col = blockIdx.x * TILE_SIZE + threadIdx.x;
-        float sum = 0.0f;
+    return pred;
+}
 
-        for (int t = 0; t < (k + TILE_SIZE - 1) / TILE_SIZE; ++t) {
-            // Load tiles into shared memory
-            if (row < m && t * TILE_SIZE + threadIdx.x < k)
-                As[threadIdx.y][threadIdx.x] = A[row * k + t * TILE_SIZE + threadIdx.x];
-            else
-                As[threadIdx.y][threadIdx.x] = 0.0f;
-
-            if (col < n && t * TILE_SIZE + threadIdx.y < k)
-                Bs[threadIdx.y][threadIdx.x] = B[(t * TILE_SIZE + threadIdx.y) * n + col];
-            else
-                Bs[threadIdx.y][threadIdx.x] = 0.0f;
-
-            __syncthreads();
-
-            // Compute partial dot product
-            for (int i = 0; i < TILE_SIZE; ++i)
-                sum += As[threadIdx.y][i] * Bs[i][threadIdx.x];
-
-            __syncthreads();
-        }
-
-        if (row < m && col < n)
-            C[row * n + col] += sum;
-    }
-
-    // Coalesced memory access implementation
-    __global__ void gemm_gpu_coalesced(int m, int n, int k, const float *A, const float *B, float *C) {
-        int row = blockIdx.y * blockDim.y + threadIdx.y;
-        int col = blockIdx.x * blockDim.x + threadIdx.x;
-
-        if (row < m && col < n) {
-            float sum = 0.0f;
-            for (int p = 0; p < k; ++p) {
-                sum += A[row * k + p] * B[p * n + col];
-            }
-            C[row * n + col] += sum;
-        }
-    }
-
-    // Combined: shared memory + coalesced access
-    __global__ void gemm_gpu_combined(int m, int n, int k, const float *A, const float *B, float *C) {
-        __shared__ float As[TILE_SIZE][TILE_SIZE];
-        __shared__ float Bs[TILE_SIZE][TILE_SIZE];
-
-        int row = blockIdx.y * TILE_SIZE + threadIdx.y;
-        int col = blockIdx.x * TILE_SIZE + threadIdx.x;
-        float sum = 0.0f;
-
-        for (int t = 0; t < (k + TILE_SIZE - 1) / TILE_SIZE; ++t) {
-            // Coalesced loads into shared memory
-            int a_col = t * TILE_SIZE + threadIdx.x;
-            int b_row = t * TILE_SIZE + threadIdx.y;
-
-            As[threadIdx.y][threadIdx.x] = (row < m && a_col < k) ? A[row * k + a_col] : 0.0f;
-            Bs[threadIdx.y][threadIdx.x] = (b_row < k && col < n) ? B[b_row * n + col] : 0.0f;
-
-            __syncthreads();
-
-            #pragma unroll
-            for (int i = 0; i < TILE_SIZE; ++i)
-                sum += As[threadIdx.y][i] * Bs[i][threadIdx.x];
-
-            __syncthreads();
-        }
-
-        if (row < m && col < n)
-            C[row * n + col] += sum;
-    }
-
-    // Main dispatcher function
-    /// \param m Number of rows of A and C
-    /// \param n Number of columns of B and C
-    /// \param k Number of columns of A and rows of B
-    /// \param strategy Optimization strategy to use
-    __host__ void gemm_gpu(int m, int n, int k, const float *A, const float *B, float *C, GemmStrategy strategy) {
-        switch(strategy) {
-            case GemmStrategy::BASELINE:
-                gemm_gpu_baseline<<<gridDim, blockDim>>>(m, n, k, A, B, C);
-                break;
-            case GemmStrategy::SHARED_MEMORY:
-                gemm_gpu_shared<<<gridDim, blockDim>>>(m, n, k, A, B, C);
-                break;
-            case GemmStrategy::COALESCED_MEMORY:
-                gemm_gpu_coalesced<<<gridDim, blockDim>>>(m, n, k, A, B, C);
-                break;
-            case GemmStrategy::COMBINED:
-                gemm_gpu_combined<<<gridDim, blockDim>>>(m, n, k, A, B, C);
-                break;
-        }
-    }
-
-    __global__ void dense_nn_gpu(int batch_size, int input_size, int output_size,
-                                 const float *input, const float *weights, const float *bias,
-                                 float *output) {
-        // Dense NN layer: output = input * weights + bias
-        // input is batch_size x input_size (row-major)
-        // weights is input_size x output_size (row-major)
-        // bias is output_size
-        // output is batch_size x output_size (row-major)
-    }
 } // namespace swiftware
