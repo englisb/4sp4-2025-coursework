@@ -11,26 +11,14 @@
 #ifndef LAB01_GPU_DENSE_NN_CUH
 #define LAB01_GPU_DENSE_NN_CUH
 
+#include "def.h"
+
 namespace swiftware::hpp
 {
-    /// \brief Matrix-matrix multiplication on GPU
-    /// \param m Number of rows of A and C
-    /// \param n Number of columns of B and C
-    /// \param k Number of columns of A and rows of B
-    /// \param A Matrix A
-    /// \param B Matrix B
-    /// \param C Matrix C
-
-    enum class GemmStrategy;
-
-    __host__ void gemm_gpu(int m, int n, int k, const float *A, const float *B, float *C, GemmStrategy strategy);
-    __global__ void gemm_gpu_baseline(int m, int n, int k, const float *A, const float *B, float *C);
-    __global__ void gemm_gpu_shared(int m, int n, int k, const float *A, const float *B, float *C);
-    __global__ void gemm_gpu_coalesced(int m, int n, int k, const float *A, const float *B, float *C);
-    __global__ void gemm_gpu_combined(int m, int n, int k, const float *A, const float *B, float *C);
-
-    __global__ void dense_nn_gpu(int batch_size, int input_size, int output_size,
-                                 const float *input, const float *weights, const float *bias,
-                                 float *output);
+    DenseMatrix *gpu_dense_nn_gemm(DenseMatrix *InData, DenseMatrix *W1, DenseMatrix *W2, 
+                                    DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp);
+    
+    DenseMatrix *gpu_dense_nn_gemv(DenseMatrix *InData, DenseMatrix *W1, DenseMatrix *W2, 
+                                    DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp);
 }
 #endif //LAB01_GPU_DENSE_NN_CUH

@@ -6,6 +6,9 @@
 // without express written permission from SwiftWare Lab.
 #ifndef PROJECT_GPU_UTILS_H
 #define PROJECT_GPU_UTILS_H
+#include <cstdio>
+#include <cstdlib>
+#include <cuda_runtime.h>
 namespace swiftware::hpp {
 
     inline void cuda_check(cudaError_t e, const char* file, int line) {

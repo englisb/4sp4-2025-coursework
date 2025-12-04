@@ -19,8 +19,8 @@ SHAREDDIR=/home/coe4sp4/
 # Source Intel MKL environment
 source /opt/intel/oneapi/setvars.sh --force
 
-cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${SHAREDDIR}/libpfm4/ -DPROFILING_ENABLED=ON -DUSE_MKL=ON -DOPENMP=ON
-#cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${SHAREDDIR}/libpfm4/ -DPROFILING_ENABLED=ON -DUSE_MKL=ON -DOPENMP=ON -DGPU_ENABLED=ON
+# cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${SHAREDDIR}/libpfm4/ -DPROFILING_ENABLED=ON -DUSE_MKL=ON -DOPENMP=ON
+cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${SHAREDDIR}/libpfm4/ -DPROFILING_ENABLED=ON -DUSE_MKL=ON -DOPENMP=ON -DGPU_ENABLED=ON
 cmake --build $(pwd)/build -- -j8
 
 
@@ -35,11 +35,15 @@ source $(pwd)/venv/bin/activate
 pip install -r $(pwd)/script/requirements.txt
 python3 $(pwd)/script/dense_nn.py
 python3 $(pwd)/script/sparsify_weight.py
+python3 $(pwd)/script/custom_sparsity.py
 
 
 echo "---- Running CPU ----"
 
 mkdir -p $(pwd)/logs
+# Clean up old JSON files before running benchmarks to prevent corruption
+rm -f $(pwd)/logs/project.json $(pwd)/logs/nn_cpu.json
+
 $(pwd)/build/project --benchmark_out="$(pwd)/logs/project.json" --benchmark_out_format=json --benchmark_perf_counters="L1-dcache-loads"
 $(pwd)/build/nn_cpu --benchmark_out="$(pwd)/logs/nn_cpu.json" --benchmark_out_format=json
 

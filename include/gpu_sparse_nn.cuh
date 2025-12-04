@@ -9,9 +9,15 @@
 #ifndef LAB01_GPU_SPARSE_NN_CUH
 #define LAB01_GPU_SPARSE_NN_CUH
 
+#include "def.h"
+
 namespace swiftware::hpp
 {
-
+    DenseMatrix *gpu_sparseNNSpmm(DenseMatrix *InData, CSR *W1, CSR *W2, 
+                                   DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp);
+    
+    DenseMatrix *gpu_sparseNNSpmv(DenseMatrix *InData, CSR *W1, CSR *W2, 
+                                   DenseMatrix *B1, DenseMatrix *B2, ScheduleParams Sp);
 }
 
 #endif //LAB01_GPU_SPARSE_NN_CUH
