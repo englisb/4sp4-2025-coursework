@@ -29,6 +29,12 @@ namespace swiftware::hpp {
 #ifdef USE_MKL
  void gemmMKL(int m, int n, int k, const float *A, const float *B, float *C, ScheduleParams Sp);
 #endif
+
+ // Different optimization implementations
+ void gemm_naive(int m, int n, int k, const float *A, const float *B, float *C, ScheduleParams Sp);
+ void gemm_simd(int m, int n, int k, const float *A, const float *B, float *C, ScheduleParams Sp);
+ void gemm_simd_parallel(int m, int n, int k, const float *A, const float *B, float *C, ScheduleParams Sp);
+ void gemm_tiled_simd_parallel(int m, int n, int k, const float *A, const float *B, float *C, ScheduleParams Sp);
 }
 
 #endif //PROJECT_DENSE_MATMUL_GEMM_H

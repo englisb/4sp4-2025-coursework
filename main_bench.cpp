@@ -5,12 +5,39 @@
 // Distribution of this code is not permitted in any form
 // without express written permission from SwiftWare Lab.
 
+// Control flags for quick vs comprehensive benchmarking
+// Uncomment QUICK_RUN for faster execution (excludes slow 4096 and naive benchmarks at 1024+)
+#define QUICK_RUN
+
 #include "benchmark/benchmark.h"
 #include "gemm.h"
 #include "gemv.h"
 #include "spmm.h"
 #include "spmv.h"
 #include "utils.h"
+
+// Macro to generate powers of 2 tile size registrations (64, 128, 256, 512, 1024)
+// Usage: REG_POW2_TILES(BM_GEMM, 64, 64, 64)
+#define REG_POW2_TILES(FN, M, N, K, REPS) \
+  BENCHMARK(FN)->Args({M, N, K, 8, 8})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS); \
+  BENCHMARK(FN)->Args({M, N, K, 16, 16})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS); \
+  BENCHMARK(FN)->Args({M, N, K, 32, 32})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS); \
+  BENCHMARK(FN)->Args({M, N, K, 64, 64})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS);
+
+// Macro for asymmetric tile variants
+#define REG_ASYMM_TILES(FN, M, N, K, T1, T2, REPS) \
+  BENCHMARK(FN)->Args({M, N, K, T1, T2})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS);
+
+// Macro for single tile registration
+#define REG_TILE(FN, M, N, K, T1, T2, REPS) \
+  BENCHMARK(FN)->Args({M, N, K, T1, T2})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS);
+
+// Macro for SPMM tile sizes (powers of 2: 8, 16, 32, 64, 128)
+#define REG_SPMM_POW2(FN, M, N, K, REPS) \
+  BENCHMARK(FN)->Args({M, N, K, 8, 8})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS); \
+  BENCHMARK(FN)->Args({M, N, K, 16, 16})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS); \
+  BENCHMARK(FN)->Args({M, N, K, 32, 32})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS); \
+  BENCHMARK(FN)->Args({M, N, K, 64, 64})->Unit(benchmark::kMicrosecond)->Iterations(1)->Repetitions(REPS);
 
 static void BM_GEMM(benchmark::State &state) {
   int m = state.range(0);
@@ -29,13 +56,80 @@ static void BM_GEMM(benchmark::State &state) {
   }
 
   for (auto _ : state) {
-    swiftware::hpp::gemm(m, n, k, A->data.data(), B->data.data(),
+    swiftware::hpp::gemm_tiled_simd_parallel(m, n, k, A->data.data(), B->data.data(),
                          C->data.data(),
                          swiftware::hpp::ScheduleParams(t1, t2));
   }
   delete A;
   delete B;
   delete C;
+}
+
+// Variant-specific GEMM benchmarks
+static void BM_GEMM_NAIVE(benchmark::State &state) {
+    int m = state.range(0);
+    int n = state.range(1);
+    int k = state.range(2);
+    auto *A = new swiftware::hpp::DenseMatrix(m, k);
+    auto *B = new swiftware::hpp::DenseMatrix(k, n);
+    auto *C = new swiftware::hpp::DenseMatrix(m, n);
+    std::fill(A->data.begin(), A->data.end(), 1.0f);
+    std::fill(B->data.begin(), B->data.end(), 1.0f);
+    for (auto _ : state) {
+        swiftware::hpp::gemm_naive(m, n, k, A->data.data(), B->data.data(),
+                                                             C->data.data(), swiftware::hpp::ScheduleParams(-1, -1));
+    }
+    delete A; delete B; delete C;
+}
+
+static void BM_GEMM_SIMD(benchmark::State &state) {
+    int m = state.range(0);
+    int n = state.range(1);
+    int k = state.range(2);
+    auto *A = new swiftware::hpp::DenseMatrix(m, k);
+    auto *B = new swiftware::hpp::DenseMatrix(k, n);
+    auto *C = new swiftware::hpp::DenseMatrix(m, n);
+    std::fill(A->data.begin(), A->data.end(), 1.0f);
+    std::fill(B->data.begin(), B->data.end(), 1.0f);
+    for (auto _ : state) {
+        swiftware::hpp::gemm_simd(m, n, k, A->data.data(), B->data.data(),
+                                                            C->data.data(), swiftware::hpp::ScheduleParams(-1, -1));
+    }
+    delete A; delete B; delete C;
+}
+
+static void BM_GEMM_SIMD_PAR(benchmark::State &state) {
+    int m = state.range(0);
+    int n = state.range(1);
+    int k = state.range(2);
+    auto *A = new swiftware::hpp::DenseMatrix(m, k);
+    auto *B = new swiftware::hpp::DenseMatrix(k, n);
+    auto *C = new swiftware::hpp::DenseMatrix(m, n);
+    std::fill(A->data.begin(), A->data.end(), 1.0f);
+    std::fill(B->data.begin(), B->data.end(), 1.0f);
+    for (auto _ : state) {
+        swiftware::hpp::gemm_simd_parallel(m, n, k, A->data.data(), B->data.data(),
+                                                                             C->data.data(), swiftware::hpp::ScheduleParams(-1, -1));
+    }
+    delete A; delete B; delete C;
+}
+
+static void BM_GEMM_TILED_SIMD_PAR(benchmark::State &state) {
+    int m = state.range(0);
+    int n = state.range(1);
+    int k = state.range(2);
+    int t1 = state.range(3);
+    int t2 = state.range(4);
+    auto *A = new swiftware::hpp::DenseMatrix(m, k);
+    auto *B = new swiftware::hpp::DenseMatrix(k, n);
+    auto *C = new swiftware::hpp::DenseMatrix(m, n);
+    std::fill(A->data.begin(), A->data.end(), 1.0f);
+    std::fill(B->data.begin(), B->data.end(), 1.0f);
+    for (auto _ : state) {
+        swiftware::hpp::gemm_tiled_simd_parallel(m, n, k, A->data.data(), B->data.data(),
+                                                                                         C->data.data(), swiftware::hpp::ScheduleParams(t1, t2));
+    }
+    delete A; delete B; delete C;
 }
 
 static void BM_SPMM(benchmark::State &state) {
@@ -90,6 +184,8 @@ static void BM_SPMM(benchmark::State &state) {
 static void BM_SPMV(benchmark::State &state) {
   int m = state.range(0);
   int n = state.range(1);
+  int t1 = state.range(2);
+  int t2 = state.range(3);
 
   // Create a sparse matrix A (m x n) in CSR format
   // Using a simple pattern: diagonal + some off-diagonal elements
@@ -118,7 +214,7 @@ static void BM_SPMV(benchmark::State &state) {
   }
   std::fill(c->data.begin(), c->data.end(), 0.0f);
 
-  swiftware::hpp::ScheduleParams scheduleParams(-1, -1);
+  swiftware::hpp::ScheduleParams scheduleParams(t1, t2);
 
   for (auto _ : state) {
     swiftware::hpp::spmvCSR(m, n, A_csr->Ap.data(), A_csr->Ai.data(),
@@ -132,221 +228,351 @@ static void BM_SPMV(benchmark::State &state) {
   delete c;
 }
 
-static void BM_GEMV(benchmark::State &state) {
-  int m = state.range(0);
-  int n = state.range(1);
-  auto *A = new swiftware::hpp::DenseMatrix(m, n);
-  auto *x = new swiftware::hpp::DenseMatrix(n, 1);
-  auto *y = new swiftware::hpp::DenseMatrix(m, 1);
+// GEMV benchmark with tiling parameters
 
-  for (int i = 0; i < m * n; ++i) {
-    A->data[i] = 1.0;
-  }
-  for (int i = 0; i < n; ++i) {
-    x->data[i] = 1.0;
-  }
-
-  for (auto _ : state) {
-    swiftware::hpp::gemv(m, n, A->data.data(), x->data.data(), y->data.data(),
-                         swiftware::hpp::ScheduleParams(-1, -1));
-  }
-
-  delete A;
-  delete x;
-  delete y;
+// Variant-specific GEMV benchmarks
+static void BM_GEMV_NAIVE(benchmark::State &state) {
+    int m = state.range(0);
+    int n = state.range(1);
+    auto *A = new swiftware::hpp::DenseMatrix(m, n);
+    auto *x = new swiftware::hpp::DenseMatrix(n, 1);
+    auto *y = new swiftware::hpp::DenseMatrix(m, 1);
+    std::fill(A->data.begin(), A->data.end(), 1.0f);
+    std::fill(x->data.begin(), x->data.end(), 1.0f);
+    std::fill(y->data.begin(), y->data.end(), 0.0f);
+    for (auto _ : state) {
+        swiftware::hpp::gemv_naive(m, n, A->data.data(), x->data.data(), y->data.data(),
+                                                             swiftware::hpp::ScheduleParams(-1, -1));
+    }
+    delete A; delete x; delete y;
 }
 
-// For baseline and simd where tile sizes are not used
-BENCHMARK(BM_GEMM)
-    ->Args({64, 64, 64, -1, -1})
+static void BM_GEMV_SIMD(benchmark::State &state) {
+    int m = state.range(0);
+    int n = state.range(1);
+    auto *A = new swiftware::hpp::DenseMatrix(m, n);
+    auto *x = new swiftware::hpp::DenseMatrix(n, 1);
+    auto *y = new swiftware::hpp::DenseMatrix(m, 1);
+    std::fill(A->data.begin(), A->data.end(), 1.0f);
+    std::fill(x->data.begin(), x->data.end(), 1.0f);
+    std::fill(y->data.begin(), y->data.end(), 0.0f);
+    for (auto _ : state) {
+        swiftware::hpp::gemv_simd(m, n, A->data.data(), x->data.data(), y->data.data(),
+                                                            swiftware::hpp::ScheduleParams(-1, -1));
+    }
+    delete A; delete x; delete y;
+}
+
+static void BM_GEMV_SIMD_PAR(benchmark::State &state) {
+    int m = state.range(0);
+    int n = state.range(1);
+    auto *A = new swiftware::hpp::DenseMatrix(m, n);
+    auto *x = new swiftware::hpp::DenseMatrix(n, 1);
+    auto *y = new swiftware::hpp::DenseMatrix(m, 1);
+    std::fill(A->data.begin(), A->data.end(), 1.0f);
+    std::fill(x->data.begin(), x->data.end(), 1.0f);
+    std::fill(y->data.begin(), y->data.end(), 0.0f);
+    for (auto _ : state) {
+        swiftware::hpp::gemv_simd_parallel(m, n, A->data.data(), x->data.data(), y->data.data(),
+                                                                             swiftware::hpp::ScheduleParams(-1, -1));
+    }
+    delete A; delete x; delete y;
+}
+
+
+
+// Variant-specific registrations (naive and simd variants) - sweep across sizes
+// These are for the stacked bar plots showing optimization technique comparison
+BENCHMARK(BM_GEMM_NAIVE)
+    ->Args({64, 64, 64})
+    ->Args({128, 128, 128})
+    ->Args({256, 256, 256})
+    ->Args({512, 512, 512})
+#ifndef QUICK_RUN
+    ->Args({1024, 1024, 1024})
+    ->Args({4096, 4096, 4096})
+#endif
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
-    ->Repetitions(10);
+    ->Repetitions(5);
 
-// GEMM with various tile sizes (must be < matrix dims)
-BENCHMARK(BM_GEMM)
+BENCHMARK(BM_GEMM_SIMD)
+    ->Args({64, 64, 64})
+    ->Args({128, 128, 128})
+    ->Args({256, 256, 256})
+    ->Args({512, 512, 512})
+    ->Args({1024, 1024, 1024})
+#ifndef QUICK_RUN
+    ->Args({4096, 4096, 4096})
+#endif
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(5);
+
+BENCHMARK(BM_GEMM_SIMD_PAR)
+    ->Args({64, 64, 64})
+    ->Args({128, 128, 128})
+    ->Args({256, 256, 256})
+    ->Args({512, 512, 512})
+    ->Args({1024, 1024, 1024})
+#ifndef QUICK_RUN
+    ->Args({4096, 4096, 4096})
+#endif
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(5);
+
+// GEMM TILED variant - comprehensive tile size sweeps
+// For each matrix size, test multiple tile configurations
+BENCHMARK(BM_GEMM_TILED_SIMD_PAR)
+    // 64x64x64 - tile sizes from 8 to 64
     ->Args({64, 64, 64, 8, 8})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
     ->Args({64, 64, 64, 16, 16})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
     ->Args({64, 64, 64, 32, 32})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
     ->Args({64, 64, 64, 64, 64})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
-    ->Args({128, 128, 128, -1, -1})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
+    // Non-square tiles for 64
+    ->Args({64, 64, 64, 16, 32})
+    ->Args({64, 64, 64, 32, 16})
+    // 128x128x128 - tile sizes from 8 to 128
+    ->Args({128, 128, 128, 8, 8})
     ->Args({128, 128, 128, 16, 16})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
     ->Args({128, 128, 128, 32, 32})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
     ->Args({128, 128, 128, 64, 64})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
     ->Args({128, 128, 128, 128, 128})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
-    ->Args({256, 256, 256, -1, -1})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-    BENCHMARK(BM_GEMM)
+    // Non-square tiles for 128
+    ->Args({128, 128, 128, 16, 32})
+    ->Args({128, 128, 128, 32, 64})
+    ->Args({128, 128, 128, 64, 32})
+    // 256x256x256 - tile sizes from 8 to 256
+    ->Args({256, 256, 256, 8, 8})
+    ->Args({256, 256, 256, 16, 16})
     ->Args({256, 256, 256, 32, 32})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
-    ->Args({512, 512, 512, -1, -1})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-    BENCHMARK(BM_GEMM)
-    ->Args({512, 512, 512, 64, 64})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
-    ->Args({1024, 1024, 1024, -1, -1})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-    BENCHMARK(BM_GEMM)
-    ->Args({1024, 1024, 1024, 128, 128})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-// Optional larger tiles only for bigger sizes
-BENCHMARK(BM_GEMM)
-    ->Args({1024, 1024, 1024, 256, 256})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-// Asymmetric tiling
-BENCHMARK(BM_GEMM)
-    ->Args({512, 512, 512, 64, 128})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
-    ->Args({512, 512, 512, 128, 64})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
+    ->Args({256, 256, 256, 64, 64})
+    ->Args({256, 256, 256, 128, 128})
+    ->Args({256, 256, 256, 256, 256})
+    // Non-square tiles for 256
     ->Args({256, 256, 256, 32, 64})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_GEMM)
-    ->Args({256, 256, 256, 64, 32})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-// GEMV benchmark
-BENCHMARK(BM_GEMV)
-    ->Args({4096, 4096})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-// SPMM benchmarks
-BENCHMARK(BM_SPMM)
-    ->Args({64, 64, 64, -1, -1})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_SPMM)
-    ->Args({64, 64, 64, 8, 8})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_SPMM)
-    ->Args({128, 128, 128, 16, 16})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_SPMM)
-    ->Args({256, 256, 256, 32, 32})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_SPMM)
+    ->Args({256, 256, 256, 64, 128})
+    ->Args({256, 256, 256, 128, 64})
+    // 512x512x512 - tile sizes from 8 to 512
+    ->Args({512, 512, 512, 8, 8})
+    ->Args({512, 512, 512, 16, 16})
+    ->Args({512, 512, 512, 32, 32})
     ->Args({512, 512, 512, 64, 64})
-    ->Unit(benchmark::kMicrosecond)
-    ->Iterations(1)
-    ->Repetitions(10);
-
-BENCHMARK(BM_SPMM)
+    ->Args({512, 512, 512, 128, 128})
+    ->Args({512, 512, 512, 256, 256})
+    ->Args({512, 512, 512, 512, 512})
+    // Non-square tiles for 512
+    ->Args({512, 512, 512, 64, 128})
+    ->Args({512, 512, 512, 128, 256})
+    ->Args({512, 512, 512, 256, 128})
+    // 1024x1024x1024 - tile sizes from 8 to 1024
+    ->Args({1024, 1024, 1024, 8, 8})
+    ->Args({1024, 1024, 1024, 16, 16})
+    ->Args({1024, 1024, 1024, 32, 32})
+    ->Args({1024, 1024, 1024, 64, 64})
     ->Args({1024, 1024, 1024, 128, 128})
+    ->Args({1024, 1024, 1024, 256, 256})
+    ->Args({1024, 1024, 1024, 512, 512})
+    ->Args({1024, 1024, 1024, 1024, 1024})
+    // Non-square tiles for 1024
+    ->Args({1024, 1024, 1024, 128, 256})
+    ->Args({1024, 1024, 1024, 256, 512})
+    ->Args({1024, 1024, 1024, 512, 256})
+#ifndef QUICK_RUN
+    // 4096x4096x4096 - tile sizes from 8 to 1024 (don't go beyond 1024 for tiles)
+    ->Args({4096, 4096, 4096, 8, 8})
+    ->Args({4096, 4096, 4096, 16, 16})
+    ->Args({4096, 4096, 4096, 32, 32})
+    ->Args({4096, 4096, 4096, 64, 64})
+    ->Args({4096, 4096, 4096, 128, 128})
+    ->Args({4096, 4096, 4096, 256, 256})
+    ->Args({4096, 4096, 4096, 512, 512})
+    ->Args({4096, 4096, 4096, 1024, 1024})
+    // Non-square tiles for 4096
+    ->Args({4096, 4096, 4096, 256, 512})
+    ->Args({4096, 4096, 4096, 512, 1024})
+    ->Args({4096, 4096, 4096, 1024, 512})
+#endif
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
-    ->Repetitions(10);
+    ->Repetitions(5);
 
-// SPMV benchmarks
-BENCHMARK(BM_SPMV)
+// GEMM registrations using new BENCHMARK() format above
+
+// Variant-specific GEMV registrations - sweep across sizes for stacked bar plots
+BENCHMARK(BM_GEMV_NAIVE)
+    ->Args({64, 64})
+    ->Args({128, 128})
+    ->Args({256, 256})
+    ->Args({512, 512})
+#ifndef QUICK_RUN
+    ->Args({1024, 1024})
     ->Args({4096, 4096})
+#endif
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
-    ->Repetitions(10);
+    ->Repetitions(5);
 
-BENCHMARK(BM_SPMV)
-    ->Args({8192, 8192})
+BENCHMARK(BM_GEMV_SIMD)
+    ->Args({64, 64})
+    ->Args({128, 128})
+    ->Args({256, 256})
+    ->Args({512, 512})
+    ->Args({1024, 1024})
+#ifndef QUICK_RUN
+    ->Args({4096, 4096})
+#endif
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
-    ->Repetitions(10);
+    ->Repetitions(5);
 
-BENCHMARK(BM_SPMV)
-    ->Args({16384, 16384})
+BENCHMARK(BM_GEMV_SIMD_PAR)
+    ->Args({64, 64})
+    ->Args({128, 128})
+    ->Args({256, 256})
+    ->Args({512, 512})
+    ->Args({1024, 1024})
+#ifndef QUICK_RUN
+    ->Args({4096, 4096})
+#endif
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
-    ->Repetitions(10);
+    ->Repetitions(5);
+
+// SPMM benchmarks - comprehensive tile size sweeps
+BENCHMARK(BM_SPMM)
+    // 64x64x64 - tile sizes from 8 to 64
+    ->Args({64, 64, 64, 8, 8})
+    ->Args({64, 64, 64, 16, 16})
+    ->Args({64, 64, 64, 32, 32})
+    ->Args({64, 64, 64, 64, 64})
+    // Non-square tiles for 64
+    ->Args({64, 64, 64, 16, 32})
+    ->Args({64, 64, 64, 32, 16})
+    // 128x128x128 - tile sizes from 8 to 128
+    ->Args({128, 128, 128, 8, 8})
+    ->Args({128, 128, 128, 16, 16})
+    ->Args({128, 128, 128, 32, 32})
+    ->Args({128, 128, 128, 64, 64})
+    ->Args({128, 128, 128, 128, 128})
+    // Non-square tiles for 128
+    ->Args({128, 128, 128, 16, 32})
+    ->Args({128, 128, 128, 32, 64})
+    ->Args({128, 128, 128, 64, 32})
+    // 256x256x256 - tile sizes from 8 to 256
+    ->Args({256, 256, 256, 8, 8})
+    ->Args({256, 256, 256, 16, 16})
+    ->Args({256, 256, 256, 32, 32})
+    ->Args({256, 256, 256, 64, 64})
+    ->Args({256, 256, 256, 128, 128})
+    ->Args({256, 256, 256, 256, 256})
+    // Non-square tiles for 256
+    ->Args({256, 256, 256, 32, 64})
+    ->Args({256, 256, 256, 64, 128})
+    ->Args({256, 256, 256, 128, 64})
+    // 512x512x512 - tile sizes from 8 to 512
+    ->Args({512, 512, 512, 8, 8})
+    ->Args({512, 512, 512, 16, 16})
+    ->Args({512, 512, 512, 32, 32})
+    ->Args({512, 512, 512, 64, 64})
+    ->Args({512, 512, 512, 128, 128})
+    ->Args({512, 512, 512, 256, 256})
+    ->Args({512, 512, 512, 512, 512})
+    // Non-square tiles for 512
+    ->Args({512, 512, 512, 64, 128})
+    ->Args({512, 512, 512, 128, 256})
+    ->Args({512, 512, 512, 256, 128})
+    // 1024x1024x1024 - tile sizes from 8 to 1024
+    ->Args({1024, 1024, 1024, 8, 8})
+    ->Args({1024, 1024, 1024, 16, 16})
+    ->Args({1024, 1024, 1024, 32, 32})
+    ->Args({1024, 1024, 1024, 64, 64})
+    ->Args({1024, 1024, 1024, 128, 128})
+    ->Args({1024, 1024, 1024, 256, 256})
+    ->Args({1024, 1024, 1024, 512, 512})
+    ->Args({1024, 1024, 1024, 1024, 1024})
+    // Non-square tiles for 1024
+    ->Args({1024, 1024, 1024, 128, 256})
+    ->Args({1024, 1024, 1024, 256, 512})
+    ->Args({1024, 1024, 1024, 512, 256})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(5);
+
+// SPMV benchmarks - comprehensive tile size sweeps
+BENCHMARK(BM_SPMV)
+    // 64x64 - tile sizes from 8 to 64
+    ->Args({64, 64, 8, 8})
+    ->Args({64, 64, 16, 16})
+    ->Args({64, 64, 32, 32})
+    ->Args({64, 64, 64, 64})
+    // Non-square tiles for 64
+    ->Args({64, 64, 16, 32})
+    ->Args({64, 64, 32, 16})
+    // 128x128 - tile sizes from 8 to 128
+    ->Args({128, 128, 8, 8})
+    ->Args({128, 128, 16, 16})
+    ->Args({128, 128, 32, 32})
+    ->Args({128, 128, 64, 64})
+    ->Args({128, 128, 128, 128})
+    // Non-square tiles for 128
+    ->Args({128, 128, 16, 32})
+    ->Args({128, 128, 32, 64})
+    ->Args({128, 128, 64, 32})
+    // 256x256 - tile sizes from 8 to 256
+    ->Args({256, 256, 8, 8})
+    ->Args({256, 256, 16, 16})
+    ->Args({256, 256, 32, 32})
+    ->Args({256, 256, 64, 64})
+    ->Args({256, 256, 128, 128})
+    ->Args({256, 256, 256, 256})
+    // Non-square tiles for 256
+    ->Args({256, 256, 32, 64})
+    ->Args({256, 256, 64, 128})
+    ->Args({256, 256, 128, 64})
+    // 512x512 - tile sizes from 8 to 512
+    ->Args({512, 512, 8, 8})
+    ->Args({512, 512, 16, 16})
+    ->Args({512, 512, 32, 32})
+    ->Args({512, 512, 64, 64})
+    ->Args({512, 512, 128, 128})
+    ->Args({512, 512, 256, 256})
+    ->Args({512, 512, 512, 512})
+    // Non-square tiles for 512
+    ->Args({512, 512, 64, 128})
+    ->Args({512, 512, 128, 256})
+    ->Args({512, 512, 256, 128})
+    // 1024x1024 - tile sizes from 8 to 1024
+    ->Args({1024, 1024, 8, 8})
+    ->Args({1024, 1024, 16, 16})
+    ->Args({1024, 1024, 32, 32})
+    ->Args({1024, 1024, 64, 64})
+    ->Args({1024, 1024, 128, 128})
+    ->Args({1024, 1024, 256, 256})
+    ->Args({1024, 1024, 512, 512})
+    ->Args({1024, 1024, 1024, 1024})
+    // Non-square tiles for 1024
+    ->Args({1024, 1024, 128, 256})
+    ->Args({1024, 1024, 256, 512})
+    ->Args({1024, 1024, 512, 256})
+#ifndef QUICK_RUN
+    // 4096x4096 - tile sizes from 8 to 1024
+    ->Args({4096, 4096, 8, 8})
+    ->Args({4096, 4096, 16, 16})
+    ->Args({4096, 4096, 32, 32})
+    ->Args({4096, 4096, 64, 64})
+    ->Args({4096, 4096, 128, 128})
+    ->Args({4096, 4096, 256, 256})
+    ->Args({4096, 4096, 512, 512})
+    ->Args({4096, 4096, 1024, 1024})
+    // Non-square tiles for 4096
+    ->Args({4096, 4096, 256, 512})
+    ->Args({4096, 4096, 512, 1024})
+    ->Args({4096, 4096, 1024, 512})
+#endif
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(5);
 
 BENCHMARK_MAIN();

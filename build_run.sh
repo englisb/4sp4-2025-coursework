@@ -40,6 +40,9 @@ python3 $(pwd)/script/sparsify_weight.py
 echo "---- Running CPU ----"
 
 mkdir -p $(pwd)/logs
+# Clean up old JSON files before running benchmarks to prevent corruption
+rm -f $(pwd)/logs/project.json $(pwd)/logs/nn_cpu.json
+
 $(pwd)/build/project --benchmark_out="$(pwd)/logs/project.json" --benchmark_out_format=json --benchmark_perf_counters="L1-dcache-loads"
 $(pwd)/build/nn_cpu --benchmark_out="$(pwd)/logs/nn_cpu.json" --benchmark_out_format=json
 
