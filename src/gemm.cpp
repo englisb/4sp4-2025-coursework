@@ -186,7 +186,6 @@ void gemm_tiled_simd_parallel(int m, int n, int k, const float *A,
   }
 }
 
-// Dispatcher removed - use specific implementations directly
 // This stub is kept for header compatibility
 void gemm(int m, int n, int k, const float *A, const float *B, float *C, ScheduleParams Sp) {
   gemm_tiled_simd_parallel(m, n, k, A, B, C, Sp);

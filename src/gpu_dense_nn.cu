@@ -47,7 +47,7 @@ DenseMatrix *gpu_dense_nn_gemm(DenseMatrix *InData, DenseMatrix *W1, DenseMatrix
     // Layer 1: H = tanh(X * W1^T + b1)
     dim3 block(TILE_SIZE, TILE_SIZE);
     dim3 grid1((hiddenSize + TILE_SIZE - 1) / TILE_SIZE, (batchSize + TILE_SIZE - 1) / TILE_SIZE);
-    MM<<<grid1, block>>>(d_input, d_W1, d_H, batchSize, hiddenSize, inputSize);
+    gemm_gpu_combined<<<grid1, block>>>(batchSize, hiddenSize, inputSize, d_input, d_W1, d_H);
     CUDA_CHECK(cudaGetLastError());
 
     // Add bias
@@ -62,7 +62,7 @@ DenseMatrix *gpu_dense_nn_gemm(DenseMatrix *InData, DenseMatrix *W1, DenseMatrix
 
     // Layer 2: Z = sigmoid(H * W2^T + b2)
     dim3 grid2((outputSize + TILE_SIZE - 1) / TILE_SIZE, (batchSize + TILE_SIZE - 1) / TILE_SIZE);
-    MM<<<grid2, block>>>(d_H, d_W2, d_Z, batchSize, outputSize, hiddenSize);
+    gemm_gpu_combined<<<grid2, block>>>(batchSize, outputSize, hiddenSize, d_H, d_W2, d_Z);
     CUDA_CHECK(cudaGetLastError());
 
     // Add bias

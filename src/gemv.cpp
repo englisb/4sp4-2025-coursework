@@ -127,7 +127,6 @@ void gemv_simd_parallel(int m, int n, const float *A, const float *x, float *y,
   }
 }
 
-// Dispatcher removed - use specific implementations directly
 // This stub is kept for header compatibility
 void gemv(int m, int n, const float *A, const float *x, float *y, ScheduleParams Sp) {
   gemv_simd_parallel(m, n, A, x, y, Sp);

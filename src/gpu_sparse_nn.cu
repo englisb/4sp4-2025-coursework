@@ -73,8 +73,8 @@ DenseMatrix *gpu_sparseNNSpmm(DenseMatrix *InData, CSR *W1, CSR *W2,
 
   // Layer 1: H = tanh(X * W1^T + b1)
   int blocks = (hiddenSize + threads - 1) / threads;
-  SpMM<<<blocks, threads>>>(d_W1_row_ptr, d_W1_col_id, d_W1_val, d_input, d_H,
-                            hiddenSize, batchSize, inputSize);
+  SpMM_COMBINED<<<blocks, threads>>>(d_W1_row_ptr, d_W1_col_id, d_W1_val, d_input, d_H,
+                                     hiddenSize, batchSize, inputSize);
   CUDA_CHECK(cudaGetLastError());
 
   // Add bias
@@ -88,8 +88,8 @@ DenseMatrix *gpu_sparseNNSpmm(DenseMatrix *InData, CSR *W1, CSR *W2,
 
   // Layer 2: Z = sigmoid(H * W2^T + b2)
   blocks = (outputSize + threads - 1) / threads;
-  SpMM<<<blocks, threads>>>(d_W2_row_ptr, d_W2_col_id, d_W2_val, d_H, d_Z,
-                            outputSize, batchSize, hiddenSize);
+  SpMM_COMBINED<<<blocks, threads>>>(d_W2_row_ptr, d_W2_col_id, d_W2_val, d_H, d_Z,
+                                     outputSize, batchSize, hiddenSize);
   CUDA_CHECK(cudaGetLastError());
 
   // Add bias
@@ -193,8 +193,8 @@ DenseMatrix *gpu_sparseNNSpmv(DenseMatrix *InData, CSR *W1, CSR *W2,
 
     // Layer 1: H = tanh(W1 * x + b1)
     int blocks = (hiddenSize + threads - 1) / threads;
-    SpMV<<<blocks, threads>>>(d_W1_row_ptr, d_W1_col_id, d_W1_val, d_input, d_H,
-                              hiddenSize, inputSize);
+    SpMV_COMBINED<<<blocks, threads>>>(d_W1_row_ptr, d_W1_col_id, d_W1_val, d_input, d_H,
+                       hiddenSize, inputSize);
     CUDA_CHECK(cudaGetLastError());
 
     // Add bias
@@ -207,8 +207,8 @@ DenseMatrix *gpu_sparseNNSpmv(DenseMatrix *InData, CSR *W1, CSR *W2,
 
     // Layer 2: Z = sigmoid(W2 * H + b2)
     blocks = (outputSize + threads - 1) / threads;
-    SpMV<<<blocks, threads>>>(d_W2_row_ptr, d_W2_col_id, d_W2_val, d_H, d_Z,
-                              outputSize, hiddenSize);
+    SpMV_COMBINED<<<blocks, threads>>>(d_W2_row_ptr, d_W2_col_id, d_W2_val, d_H, d_Z,
+                       outputSize, hiddenSize);
     CUDA_CHECK(cudaGetLastError());
 
     // Add bias

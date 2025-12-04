@@ -9,6 +9,7 @@
 #include "dense_nn.h"
 #include "sparse_nn.h"
 #include "utils.h"
+#include <string>
 
 static void BM_DENSENN(benchmark::State &state) {
   auto *mnistData = swiftware::hpp::readCSV("./data/mnist_train.csv", true);
@@ -100,11 +101,13 @@ static void BM_SPARSENN(benchmark::State &state) {
   }
 
   // Load sparse weights and convert to CSR format
-  // Using 50% sparsity as an example (can be changed to other sparsity levels)
-  auto *weightsHiddenCSR =
-      swiftware::hpp::loadPrunedWeightsCSR("./data/model/50_W1.csv");
-  auto *weightsOutputCSR =
-      swiftware::hpp::loadPrunedWeightsCSR("./data/model/50_W2.csv");
+  // Sparsity level is passed as the third range parameter
+  int sparsity = state.range(2);
+  std::string w1_file = "./data/model/" + std::to_string(sparsity) + "_W1.csv";
+  std::string w2_file = "./data/model/" + std::to_string(sparsity) + "_W2.csv";
+  
+  auto *weightsHiddenCSR = swiftware::hpp::loadPrunedWeightsCSR(w1_file);
+  auto *weightsOutputCSR = swiftware::hpp::loadPrunedWeightsCSR(w2_file);
   auto *biasesHidden =
       swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
   auto *biasesOutput =
@@ -278,8 +281,17 @@ BENCHMARK(BM_DENSENN)
     ->Iterations(1)
     ->Repetitions(1);
 
+// Sparse NN benchmark sweeping sparsity levels: 50% to 90% in steps of 5%
 BENCHMARK(BM_SPARSENN)
-    ->Args({32, 32})
+    ->Args({32, 32, 50})
+    ->Args({32, 32, 55})
+    ->Args({32, 32, 60})
+    ->Args({32, 32, 65})
+    ->Args({32, 32, 70})
+    ->Args({32, 32, 75})
+    ->Args({32, 32, 80})
+    ->Args({32, 32, 85})
+    ->Args({32, 32, 90})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
     ->Repetitions(1);
@@ -296,5 +308,76 @@ BENCHMARK(BM_SPARSITY_COMPARISON_SPARSEGPT)
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
     ->Repetitions(10);
+
+#ifdef USE_MKL
+// MKL Dense NN benchmarks for comparison against sparse implementations
+static void BM_DENSENN_MKL(benchmark::State &state) {
+  auto *mnistData = swiftware::hpp::readCSV("./data/mnist_train.csv", true);
+  auto *labels = new swiftware::hpp::DenseMatrix(mnistData->m, 1);
+  auto *features =
+      new swiftware::hpp::DenseMatrix(mnistData->m, mnistData->n - 1);
+
+  // Extract labels and features from mnist dataset
+  for (int i = 0; i < mnistData->m; i++) {
+    labels->data[i] = mnistData->data[i * mnistData->n + 0];
+    for (int j = 1; j < mnistData->n; j++) {
+      features->data[i * features->n + (j - 1)] =
+          mnistData->data[i * mnistData->n + j] / 255.0;
+    }
+  }
+
+  auto *weightsOutput =
+      swiftware::hpp::readCSV("./data/model/weights_output.csv");
+  auto *weightsHidden =
+      swiftware::hpp::readCSV("./data/model/weights_hidden.csv");
+  auto *biasesHidden =
+      swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
+  auto *biasesOutput =
+      swiftware::hpp::readCSV("./data/model/biases_output.csv");
+  swiftware::hpp::ScheduleParams scheduleParams(state.range(0), state.range(1));
+
+  int correctPredictions = 0;
+  int totalSamples = 10;
+
+  for (auto _ : state) {
+    // Running the MKL Dense NN function
+    auto *predictions = swiftware::hpp::dense_nn_mkl_gemm(
+        features, weightsHidden, weightsOutput, biasesHidden, biasesOutput,
+        scheduleParams);
+
+    // Calculate accuracy
+    state.PauseTiming();
+
+    correctPredictions = 0;
+    for (int i = 0; i < totalSamples; i++) {
+      if (static_cast<int>(predictions->data[i]) ==
+          static_cast<int>(labels->data[i])) {
+        correctPredictions++;
+      }
+    }
+
+    double accuracy =
+        (static_cast<double>(correctPredictions) / totalSamples) * 100.0;
+    state.counters["Accuracy"] = accuracy;
+
+    delete predictions;
+    state.ResumeTiming();
+  }
+
+  delete mnistData;
+  delete labels;
+  delete features;
+  delete weightsOutput;
+  delete weightsHidden;
+  delete biasesHidden;
+  delete biasesOutput;
+}
+
+BENCHMARK(BM_DENSENN_MKL)
+    ->Args({32, 32})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(1);
+#endif
 
 BENCHMARK_MAIN();
