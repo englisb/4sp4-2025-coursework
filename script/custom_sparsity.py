@@ -6,16 +6,10 @@ import numpy as np
 import os
 from torch.utils.data import Dataset, DataLoader
 
-# ==========================================
-# 1. The Neural Network Definition
-# ==========================================
 class MnistNet(nn.Module):
     def __init__(self, input_dim=784, hidden_dim=128, output_dim=10):
         super(MnistNet, self).__init__()
-        # Layer 1 definition (W1 is hidden_dim x input_dim)
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        
-        # Layer 2 definition (W2 is output_dim x hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, output_dim)
 
     def load_csv_weights(self, w_hidden_path, b_hidden_path, w_out_path, b_out_path):
@@ -40,7 +34,6 @@ class MnistNet(nn.Module):
             print("Weights loaded successfully.")
         except FileNotFoundError as e:
             print(f"Error loading CSVs: {e}")
-            print("Initializing with random weights for demonstration purposes...")
 
     def forward(self, x):
         # Flatten input
@@ -55,18 +48,13 @@ class MnistNet(nn.Module):
         # Argmax is handled during evaluation, raw Z returned here
         return z, h  # Returning h to capture inputs for the next layer pruning
 
-# ==========================================
-# 2. CSV Dataset Loader
-# ==========================================
+# CSV Dataset Loader
 class CSVDataset(Dataset):
     """Simple dataset class for loading MNIST from CSV"""
     def __init__(self, csv_path, normalize=True):
-        # MNIST CSV has a header row (e.g., 'label', 'pixel0', ...)
-        # Let pandas use the first row as header, then treat the rest as numeric data.
         data = pd.read_csv(csv_path)
 
         # First column is labels, rest are features
-        # Explicitly cast to numeric dtypes to avoid mixed-type issues.
         self.labels = data.iloc[:, 0].astype(np.int64).values
         self.features = data.iloc[:, 1:].astype(np.float32).values
         
@@ -84,9 +72,7 @@ class CSVDataset(Dataset):
     def __getitem__(self, idx):
         return self.features[idx], self.labels[idx]
 
-# ==========================================
-# 3. SparseGPT Pruner Implementation
-# ==========================================
+# SparseGPT Pruner Implementation
 class SparseGPTPruner:
     def __init__(self, layer, sparsity=0.9):
         self.layer = layer
@@ -136,7 +122,7 @@ class SparseGPTPruner:
         diag = torch.arange(self.columns, device=self.dev)
         H[diag, diag] += damp
         
-        # Invert Hessian (Using Cholesky usually, but standard inv is safer for general cases)
+        # Invert Hessian
         try:
             H_inv = torch.linalg.inv(H)
         except:
@@ -215,9 +201,8 @@ class SparseGPTPruner:
         current_sparsity = 1.0 - (torch.count_nonzero(self.layer.weight.data) / self.layer.weight.data.numel())
         print(f"Layer Pruned. Target: {self.sparsity:.2f}, Achieved: {current_sparsity:.2f}")
 
-# ==========================================
-# 4. Execution Pipeline
-# ==========================================
+
+# Execution Pipeline
 def run_pipeline():
     # Settings
     SPARSITY_RATIO = 0.10  # Remove 50% of weights

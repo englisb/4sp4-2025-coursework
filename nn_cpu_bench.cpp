@@ -170,11 +170,14 @@ static void BM_SPARSITY_COMPARISON_MAGNITUDE(benchmark::State &state) {
     }
   }
 
-  // Load magnitude-based pruned weights (50% sparsity)
-  auto *weightsHiddenCSR =
-      swiftware::hpp::loadPrunedWeightsCSR("./data/model/90_W1.csv");
-  auto *weightsOutputCSR =
-      swiftware::hpp::loadPrunedWeightsCSR("./data/model/90_W2.csv");
+  // Load magnitude-based pruned weights
+  // Sparsity level is passed as the third range parameter
+  int sparsity = state.range(2);
+  std::string w1_file = "./data/model/" + std::to_string(sparsity) + "_W1.csv";
+  std::string w2_file = "./data/model/" + std::to_string(sparsity) + "_W2.csv";
+  
+  auto *weightsHiddenCSR = swiftware::hpp::loadPrunedWeightsCSR(w1_file);
+  auto *weightsOutputCSR = swiftware::hpp::loadPrunedWeightsCSR(w2_file);
   auto *biasesHidden =
       swiftware::hpp::readCSV("./data/model/biases_hidden.csv");
   auto *biasesOutput =
@@ -231,7 +234,7 @@ static void BM_SPARSITY_COMPARISON_SPARSEGPT(benchmark::State &state) {
     }
   }
 
-  // Load SparseGPT pruned weights (50% sparsity)
+  // Load SparseGPT pruned weights (90% sparsity)
   auto *weightsHiddenCSR =
       swiftware::hpp::loadPrunedWeightsCSR("./sparseGPT/weights_hidden.csv");
   auto *weightsOutputCSR =
@@ -281,7 +284,7 @@ BENCHMARK(BM_DENSENN)
     ->Iterations(1)
     ->Repetitions(1);
 
-// Sparse NN benchmark sweeping sparsity levels: 50% to 90% in steps of 5%
+// Sparse NN benchmark sweeping sparsity levels: 50% to 95% in steps of 5%
 BENCHMARK(BM_SPARSENN)
     ->Args({32, 32, 50})
     ->Args({32, 32, 55})
@@ -292,13 +295,15 @@ BENCHMARK(BM_SPARSENN)
     ->Args({32, 32, 80})
     ->Args({32, 32, 85})
     ->Args({32, 32, 90})
+    ->Args({32, 32, 95})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
     ->Repetitions(1);
 
 // Sparsity comparison benchmarks: Magnitude-based vs SparseGPT
 BENCHMARK(BM_SPARSITY_COMPARISON_MAGNITUDE)
-    ->Args({32, 32})
+    ->Args({32, 32, 60})
+    ->Args({32, 32, 90})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
     ->Repetitions(10);

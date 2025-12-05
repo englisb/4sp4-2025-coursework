@@ -460,68 +460,6 @@ void nvbench_spmv_combined(nvbench::state &state) {
   nvbench_spmv_variant(state, swiftware::hpp::SpMV_COMBINED);
 }
 
-// ============================================================================
-// Block Size Tuning Benchmarks - Test different block sizes to find optimal
-// ============================================================================
-template <typename Kernel>
-void nvbench_spmm_blocksize_tuning(nvbench::state &state, Kernel kernel) {
-  const size_t n = static_cast<size_t>(state.get_int64("n"));
-  const int block_size = static_cast<int>(state.get_int64("block_size"));
-  const float sparsity = state.get_float64("sparsity") / 100.0f;
-
-  std::vector<int> row_ptr;
-  std::vector<int> col_id;
-  std::vector<float> values;
-  build_random_csr(n, sparsity, row_ptr, col_id, values);
-  const int nnz = static_cast<int>(values.size());
-
-  std::vector<float> h_b(n * n);
-  for (size_t i = 0; i < n * n; i++) {
-    h_b[i] = static_cast<float>(rand()) / RAND_MAX;
-  }
-
-  int *d_row_ptr = nullptr, *d_col_id = nullptr;
-  float *d_values = nullptr, *d_b = nullptr, *d_c = nullptr;
-
-  CUDA_CHECK(cudaMalloc(&d_row_ptr, (n + 1) * sizeof(int)));
-  CUDA_CHECK(cudaMalloc(&d_col_id, nnz * sizeof(int)));
-  CUDA_CHECK(cudaMalloc(&d_values, nnz * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_b, n * n * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&d_c, n * n * sizeof(float)));
-
-  CUDA_CHECK(cudaMemcpy(d_row_ptr, row_ptr.data(), (n + 1) * sizeof(int),
-                        cudaMemcpyHostToDevice));
-  CUDA_CHECK(cudaMemcpy(d_col_id, col_id.data(), nnz * sizeof(int),
-                        cudaMemcpyHostToDevice));
-  CUDA_CHECK(cudaMemcpy(d_values, values.data(), nnz * sizeof(float),
-                        cudaMemcpyHostToDevice));
-  CUDA_CHECK(cudaMemcpy(d_b, h_b.data(), n * n * sizeof(float),
-                        cudaMemcpyHostToDevice));
-  CUDA_CHECK(cudaMemset(d_c, 0, n * n * sizeof(float)));
-
-  const int blocks = static_cast<int>((n + block_size - 1) / block_size);
-
-  state.exec(nvbench::exec_tag::timer,
-             [&](nvbench::launch &, auto &timer) {
-               timer.start();
-               kernel<<<blocks, block_size>>>(d_row_ptr, d_col_id, d_values,
-                                              d_b, d_c, n, n, n);
-               timer.stop();
-             });
-
-  CUDA_CHECK(cudaFree(d_row_ptr));
-  CUDA_CHECK(cudaFree(d_col_id));
-  CUDA_CHECK(cudaFree(d_values));
-  CUDA_CHECK(cudaFree(d_b));
-  CUDA_CHECK(cudaFree(d_c));
-
-  report_summary(state);
-}
-
-void nvbench_spmm_combined_tuning(nvbench::state &state) {
-  nvbench_spmm_blocksize_tuning(state, swiftware::hpp::SpMM_COMBINED);
-}
-
 NVBENCH_BENCH(nvbench_gemm)
     .set_name("GEMM_Baseline")
     .add_int64_axis("n", {256, 512, 1024, 2048, 4096});
@@ -538,43 +476,36 @@ NVBENCH_BENCH(nvbench_gemv)
     .set_name("GEMV")
     .add_int64_axis("n", {256, 512, 1024, 2048, 4096});
 
-// Block size tuning for SpMM - test different block sizes (128, 256, 512, 1024)
-NVBENCH_BENCH(nvbench_spmm_combined_tuning)
-  .set_name("SpMM_Combined_Tuning")
-  .add_int64_axis("n", {512, 1024, 2048, 4096})
-  .add_int64_axis("block_size", {128, 256, 512, 1024})
-  .add_float64_axis("sparsity", {50.0, 70.0, 90.0});
-
 NVBENCH_BENCH(nvbench_spmm_baseline)
   .set_name("SpMM_Baseline")
-  .add_int64_axis("n", {128, 256, 512, 1024, 2048, 4096})
-  .add_float64_axis("sparsity", {50.0, 70.0, 90.0});
+  .add_int64_axis("n", {512})
+  .add_float64_axis("sparsity", {50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0});
 NVBENCH_BENCH(nvbench_spmm_coalesced)
   .set_name("SpMM_Coalesced")
-  .add_int64_axis("n", {128, 256, 512, 1024, 2048, 4096})
-  .add_float64_axis("sparsity", {50.0, 70.0, 90.0});
+  .add_int64_axis("n", {512})
+  .add_float64_axis("sparsity", {50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0});
 NVBENCH_BENCH(nvbench_spmm_shared)
   .set_name("SpMM_Shared")
-  .add_int64_axis("n", {128, 256, 512, 1024, 2048, 4096})
-  .add_float64_axis("sparsity", {50.0, 70.0, 90.0});
+  .add_int64_axis("n", {512})
+  .add_float64_axis("sparsity", {50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0});
 NVBENCH_BENCH(nvbench_spmm_combined)
   .set_name("SpMM_Combined")
-  .add_int64_axis("n", {128, 256, 512, 1024, 2048, 4096})
-  .add_float64_axis("sparsity", {50.0, 70.0, 90.0});
+  .add_int64_axis("n", {512})
+  .add_float64_axis("sparsity", {50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0});
 
 NVBENCH_BENCH(nvbench_spmv_baseline)
   .set_name("SpMV_Baseline")
-  .add_int64_axis("n", {128, 256, 512, 1024, 2048, 4096})
-  .add_float64_axis("sparsity", {50.0, 70.0, 90.0});
+  .add_int64_axis("n", {512})
+  .add_float64_axis("sparsity", {50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0});
 NVBENCH_BENCH(nvbench_spmv_coalesced)
   .set_name("SpMV_Coalesced")
-  .add_int64_axis("n", {128, 256, 512, 1024, 2048, 4096})
-  .add_float64_axis("sparsity", {50.0, 70.0, 90.0});
+  .add_int64_axis("n", {512})
+  .add_float64_axis("sparsity", {50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0});
 NVBENCH_BENCH(nvbench_spmv_warp)
   .set_name("SpMV_WarpLevel")
-  .add_int64_axis("n", {128, 256, 512, 1024, 2048, 4096})
-  .add_float64_axis("sparsity", {50.0, 70.0, 90.0});
+  .add_int64_axis("n", {512})
+  .add_float64_axis("sparsity", {50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0});
 NVBENCH_BENCH(nvbench_spmv_combined)
   .set_name("SpMV_Combined")
-  .add_int64_axis("n", {128, 256, 512, 1024, 2048, 4096})
-  .add_float64_axis("sparsity", {50.0, 70.0, 90.0});
+  .add_int64_axis("n", {512})
+  .add_float64_axis("sparsity", {50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0});

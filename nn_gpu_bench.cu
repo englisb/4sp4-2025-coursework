@@ -272,7 +272,7 @@ NVBENCH_BENCH(nvbench_gpu_dense_nn_gemv).set_name("GPU_Dense_NN_GEMV");
 
 NVBENCH_BENCH(nvbench_gpu_sparse_nn_spmm)
     .set_name("GPU_Sparse_NN_SpMM")
-    .add_int64_axis("sparsity", {50, 55, 60, 65, 70, 75, 80, 85, 90})
+    .add_int64_axis("sparsity", {50, 55, 60, 65, 70, 75, 80, 85, 90, 95})
     .add_int64_axis("batch_size", {1, 8});
 
 NVBENCH_BENCH(nvbench_gpu_sparse_nn_spmv).set_name("GPU_Sparse_NN_SpMV");

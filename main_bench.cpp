@@ -132,100 +132,197 @@ static void BM_GEMM_TILED_SIMD_PAR(benchmark::State &state) {
     delete A; delete B; delete C;
 }
 
-static void BM_SPMM(benchmark::State &state) {
+// SPMM Naive variant (t1=-1)
+static void BM_SPMM_NAIVE(benchmark::State &state) {
   int m = state.range(0);
   int n = state.range(1);
   int k = state.range(2);
-  int t1 = state.range(3);
-  int t2 = state.range(4);
+  int sparsity = state.range(3);
 
-  // Create a sparse matrix A (m x k) in CSR format
-  // Using a simple pattern: diagonal + some off-diagonal elements
-  // This creates a sparse matrix with approximately 10% sparsity
   auto *A_dense = new swiftware::hpp::DenseMatrix(m, k);
   std::fill(A_dense->data.begin(), A_dense->data.end(), 0.0f);
-
-  // Fill with a pattern: diagonal and some adjacent elements
   for (int i = 0; i < m && i < k; i++) {
-    A_dense->data[i * k + i] = 1.0f; // Diagonal
-    if (i + 1 < k) {
-      A_dense->data[i * k + (i + 1)] = 0.5f; // Next column
-    }
-    if (i > 0) {
-      A_dense->data[i * k + (i - 1)] = 0.5f; // Previous column
-    }
+    A_dense->data[i * k + i] = 1.0f;
+    if (i + 1 < k) A_dense->data[i * k + (i + 1)] = 0.5f;
+    if (i > 0) A_dense->data[i * k + (i - 1)] = 0.5f;
   }
-
   auto *A_csr = swiftware::hpp::denseToCSR(A_dense);
-
-  // Create dense matrices B (k x n) and C (m x n)
   auto *B = new swiftware::hpp::DenseMatrix(k, n);
   auto *C = new swiftware::hpp::DenseMatrix(m, n);
-
-  for (int i = 0; i < k * n; ++i) {
-    B->data[i] = 1.0;
-  }
+  for (int i = 0; i < k * n; ++i) B->data[i] = 1.0;
   std::fill(C->data.begin(), C->data.end(), 0.0f);
-
-  swiftware::hpp::ScheduleParams scheduleParams(t1, t2);
 
   for (auto _ : state) {
     swiftware::hpp::spmmCSR(m, n, k, A_csr->Ap.data(), A_csr->Ai.data(),
                             A_csr->Ax.data(), B->data.data(), C->data.data(),
-                            scheduleParams);
+                            swiftware::hpp::ScheduleParams(-1, 0));
   }
-
-  delete A_dense;
-  delete A_csr;
-  delete B;
-  delete C;
+  delete A_dense; delete A_csr; delete B; delete C;
 }
 
-static void BM_SPMV(benchmark::State &state) {
+// SPMM SIMD variant (t1=0)
+static void BM_SPMM_SIMD(benchmark::State &state) {
   int m = state.range(0);
   int n = state.range(1);
-  int t1 = state.range(2);
-  int t2 = state.range(3);
+  int k = state.range(2);
+  int sparsity = state.range(3);
 
-  // Create a sparse matrix A (m x n) in CSR format
-  // Using a simple pattern: diagonal + some off-diagonal elements
+  auto *A_dense = new swiftware::hpp::DenseMatrix(m, k);
+  std::fill(A_dense->data.begin(), A_dense->data.end(), 0.0f);
+  for (int i = 0; i < m && i < k; i++) {
+    A_dense->data[i * k + i] = 1.0f;
+    if (i + 1 < k) A_dense->data[i * k + (i + 1)] = 0.5f;
+    if (i > 0) A_dense->data[i * k + (i - 1)] = 0.5f;
+  }
+  auto *A_csr = swiftware::hpp::denseToCSR(A_dense);
+  auto *B = new swiftware::hpp::DenseMatrix(k, n);
+  auto *C = new swiftware::hpp::DenseMatrix(m, n);
+  for (int i = 0; i < k * n; ++i) B->data[i] = 1.0;
+  std::fill(C->data.begin(), C->data.end(), 0.0f);
+
+  for (auto _ : state) {
+    swiftware::hpp::spmmCSR(m, n, k, A_csr->Ap.data(), A_csr->Ai.data(),
+                            A_csr->Ax.data(), B->data.data(), C->data.data(),
+                            swiftware::hpp::ScheduleParams(0, 0));
+  }
+  delete A_dense; delete A_csr; delete B; delete C;
+}
+
+// SPMM SIMD+Parallel variant (t1=1)
+static void BM_SPMM_SIMD_PAR(benchmark::State &state) {
+  int m = state.range(0);
+  int n = state.range(1);
+  int k = state.range(2);
+  int sparsity = state.range(3);
+
+  auto *A_dense = new swiftware::hpp::DenseMatrix(m, k);
+  std::fill(A_dense->data.begin(), A_dense->data.end(), 0.0f);
+  for (int i = 0; i < m && i < k; i++) {
+    A_dense->data[i * k + i] = 1.0f;
+    if (i + 1 < k) A_dense->data[i * k + (i + 1)] = 0.5f;
+    if (i > 0) A_dense->data[i * k + (i - 1)] = 0.5f;
+  }
+  auto *A_csr = swiftware::hpp::denseToCSR(A_dense);
+  auto *B = new swiftware::hpp::DenseMatrix(k, n);
+  auto *C = new swiftware::hpp::DenseMatrix(m, n);
+  for (int i = 0; i < k * n; ++i) B->data[i] = 1.0;
+  std::fill(C->data.begin(), C->data.end(), 0.0f);
+
+  for (auto _ : state) {
+    swiftware::hpp::spmmCSR(m, n, k, A_csr->Ap.data(), A_csr->Ai.data(),
+                            A_csr->Ax.data(), B->data.data(), C->data.data(),
+                            swiftware::hpp::ScheduleParams(1, 0));
+  }
+  delete A_dense; delete A_csr; delete B; delete C;
+}
+
+// SPMM Tiled+SIMD+Parallel variant (t1=16, fixed 16x16 tile)
+static void BM_SPMM_TILED(benchmark::State &state) {
+  int m = state.range(0);
+  int n = state.range(1);
+  int k = state.range(2);
+  int sparsity = state.range(3);
+
+  auto *A_dense = new swiftware::hpp::DenseMatrix(m, k);
+  std::fill(A_dense->data.begin(), A_dense->data.end(), 0.0f);
+  for (int i = 0; i < m && i < k; i++) {
+    A_dense->data[i * k + i] = 1.0f;
+    if (i + 1 < k) A_dense->data[i * k + (i + 1)] = 0.5f;
+    if (i > 0) A_dense->data[i * k + (i - 1)] = 0.5f;
+  }
+  auto *A_csr = swiftware::hpp::denseToCSR(A_dense);
+  auto *B = new swiftware::hpp::DenseMatrix(k, n);
+  auto *C = new swiftware::hpp::DenseMatrix(m, n);
+  for (int i = 0; i < k * n; ++i) B->data[i] = 1.0;
+  std::fill(C->data.begin(), C->data.end(), 0.0f);
+
+  for (auto _ : state) {
+    swiftware::hpp::spmmCSR(m, n, k, A_csr->Ap.data(), A_csr->Ai.data(),
+                            A_csr->Ax.data(), B->data.data(), C->data.data(),
+                            swiftware::hpp::ScheduleParams(16, 16));
+  }
+  delete A_dense; delete A_csr; delete B; delete C;
+}
+
+// SPMV Naive variant (t1=-1)
+static void BM_SPMV_NAIVE(benchmark::State &state) {
+  int m = state.range(0);
+  int n = state.range(1);
+  int sparsity = state.range(2);
+
   auto *A_dense = new swiftware::hpp::DenseMatrix(m, n);
   std::fill(A_dense->data.begin(), A_dense->data.end(), 0.0f);
-
-  // Fill with a pattern: diagonal and some adjacent elements
   for (int i = 0; i < m && i < n; i++) {
-    A_dense->data[i * n + i] = 1.0f; // Diagonal
-    if (i + 1 < n) {
-      A_dense->data[i * n + (i + 1)] = 0.5f; // Next column
-    }
-    if (i > 0) {
-      A_dense->data[i * n + (i - 1)] = 0.5f; // Previous column
-    }
+    A_dense->data[i * n + i] = 1.0f;
+    if (i + 1 < n) A_dense->data[i * n + (i + 1)] = 0.5f;
+    if (i > 0) A_dense->data[i * n + (i - 1)] = 0.5f;
   }
-
   auto *A_csr = swiftware::hpp::denseToCSR(A_dense);
-
-  // Create dense vectors b (n) and c (m)
   auto *b = new swiftware::hpp::DenseMatrix(n, 1);
   auto *c = new swiftware::hpp::DenseMatrix(m, 1);
-
-  for (int i = 0; i < n; ++i) {
-    b->data[i] = 1.0;
-  }
+  for (int i = 0; i < n; ++i) b->data[i] = 1.0;
   std::fill(c->data.begin(), c->data.end(), 0.0f);
-
-  swiftware::hpp::ScheduleParams scheduleParams(t1, t2);
 
   for (auto _ : state) {
     swiftware::hpp::spmvCSR(m, n, A_csr->Ap.data(), A_csr->Ai.data(),
                             A_csr->Ax.data(), b->data.data(), c->data.data(),
-                            scheduleParams);
+                            swiftware::hpp::ScheduleParams(-1, 0));
   }
+  delete A_dense; delete A_csr; delete b; delete c;
+}
 
-  delete A_dense;
-  delete A_csr;
-  delete b;
-  delete c;
+// SPMV Parallel variant (t1=0)
+static void BM_SPMV_PARALLEL(benchmark::State &state) {
+  int m = state.range(0);
+  int n = state.range(1);
+  int sparsity = state.range(2);
+
+  auto *A_dense = new swiftware::hpp::DenseMatrix(m, n);
+  std::fill(A_dense->data.begin(), A_dense->data.end(), 0.0f);
+  for (int i = 0; i < m && i < n; i++) {
+    A_dense->data[i * n + i] = 1.0f;
+    if (i + 1 < n) A_dense->data[i * n + (i + 1)] = 0.5f;
+    if (i > 0) A_dense->data[i * n + (i - 1)] = 0.5f;
+  }
+  auto *A_csr = swiftware::hpp::denseToCSR(A_dense);
+  auto *b = new swiftware::hpp::DenseMatrix(n, 1);
+  auto *c = new swiftware::hpp::DenseMatrix(m, 1);
+  for (int i = 0; i < n; ++i) b->data[i] = 1.0;
+  std::fill(c->data.begin(), c->data.end(), 0.0f);
+
+  for (auto _ : state) {
+    swiftware::hpp::spmvCSR(m, n, A_csr->Ap.data(), A_csr->Ai.data(),
+                            A_csr->Ax.data(), b->data.data(), c->data.data(),
+                            swiftware::hpp::ScheduleParams(0, 0));
+  }
+  delete A_dense; delete A_csr; delete b; delete c;
+}
+
+// SPMV Tiled+Parallel variant (t1=16, fixed 16x16 tile)
+static void BM_SPMV_TILED(benchmark::State &state) {
+  int m = state.range(0);
+  int n = state.range(1);
+  int sparsity = state.range(2);
+
+  auto *A_dense = new swiftware::hpp::DenseMatrix(m, n);
+  std::fill(A_dense->data.begin(), A_dense->data.end(), 0.0f);
+  for (int i = 0; i < m && i < n; i++) {
+    A_dense->data[i * n + i] = 1.0f;
+    if (i + 1 < n) A_dense->data[i * n + (i + 1)] = 0.5f;
+    if (i > 0) A_dense->data[i * n + (i - 1)] = 0.5f;
+  }
+  auto *A_csr = swiftware::hpp::denseToCSR(A_dense);
+  auto *b = new swiftware::hpp::DenseMatrix(n, 1);
+  auto *c = new swiftware::hpp::DenseMatrix(m, 1);
+  for (int i = 0; i < n; ++i) b->data[i] = 1.0;
+  std::fill(c->data.begin(), c->data.end(), 0.0f);
+
+  for (auto _ : state) {
+    swiftware::hpp::spmvCSR(m, n, A_csr->Ap.data(), A_csr->Ai.data(),
+                            A_csr->Ax.data(), b->data.data(), c->data.data(),
+                            swiftware::hpp::ScheduleParams(16, 16));
+  }
+  delete A_dense; delete A_csr; delete b; delete c;
 }
 
 // GEMV benchmark with tiling parameters
@@ -440,137 +537,114 @@ BENCHMARK(BM_GEMV_SIMD_PAR)
     ->Iterations(1)
     ->Repetitions(5);
 
-// SPMM benchmarks - comprehensive tile size sweeps
-BENCHMARK(BM_SPMM)
-    // 64x64x64 - tile sizes from 8 to 64
-    ->Args({64, 64, 64, 8, 8})
-    ->Args({64, 64, 64, 16, 16})
-    ->Args({64, 64, 64, 32, 32})
-    ->Args({64, 64, 64, 64, 64})
-    // Non-square tiles for 64
-    ->Args({64, 64, 64, 16, 32})
-    ->Args({64, 64, 64, 32, 16})
-    // 128x128x128 - tile sizes from 8 to 128
-    ->Args({128, 128, 128, 8, 8})
-    ->Args({128, 128, 128, 16, 16})
-    ->Args({128, 128, 128, 32, 32})
-    ->Args({128, 128, 128, 64, 64})
-    ->Args({128, 128, 128, 128, 128})
-    // Non-square tiles for 128
-    ->Args({128, 128, 128, 16, 32})
-    ->Args({128, 128, 128, 32, 64})
-    ->Args({128, 128, 128, 64, 32})
-    // 256x256x256 - tile sizes from 8 to 256
-    ->Args({256, 256, 256, 8, 8})
-    ->Args({256, 256, 256, 16, 16})
-    ->Args({256, 256, 256, 32, 32})
-    ->Args({256, 256, 256, 64, 64})
-    ->Args({256, 256, 256, 128, 128})
-    ->Args({256, 256, 256, 256, 256})
-    // Non-square tiles for 256
-    ->Args({256, 256, 256, 32, 64})
-    ->Args({256, 256, 256, 64, 128})
-    ->Args({256, 256, 256, 128, 64})
-    // 512x512x512 - tile sizes from 8 to 512
-    ->Args({512, 512, 512, 8, 8})
-    ->Args({512, 512, 512, 16, 16})
-    ->Args({512, 512, 512, 32, 32})
-    ->Args({512, 512, 512, 64, 64})
-    ->Args({512, 512, 512, 128, 128})
-    ->Args({512, 512, 512, 256, 256})
-    ->Args({512, 512, 512, 512, 512})
-    // Non-square tiles for 512
-    ->Args({512, 512, 512, 64, 128})
-    ->Args({512, 512, 512, 128, 256})
-    ->Args({512, 512, 512, 256, 128})
-    // 1024x1024x1024 - tile sizes from 8 to 1024
-    ->Args({1024, 1024, 1024, 8, 8})
-    ->Args({1024, 1024, 1024, 16, 16})
-    ->Args({1024, 1024, 1024, 32, 32})
-    ->Args({1024, 1024, 1024, 64, 64})
-    ->Args({1024, 1024, 1024, 128, 128})
-    ->Args({1024, 1024, 1024, 256, 256})
-    ->Args({1024, 1024, 1024, 512, 512})
-    ->Args({1024, 1024, 1024, 1024, 1024})
-    // Non-square tiles for 1024
-    ->Args({1024, 1024, 1024, 128, 256})
-    ->Args({1024, 1024, 1024, 256, 512})
-    ->Args({1024, 1024, 1024, 512, 256})
+// SPMM Naive variant registrations - sweep sparsity levels (50-95%)
+BENCHMARK(BM_SPMM_NAIVE)
+    ->Args({256, 256, 256, 50})
+    ->Args({256, 256, 256, 55})
+    ->Args({256, 256, 256, 60})
+    ->Args({256, 256, 256, 65})
+    ->Args({256, 256, 256, 70})
+    ->Args({256, 256, 256, 75})
+    ->Args({256, 256, 256, 80})
+    ->Args({256, 256, 256, 85})
+    ->Args({256, 256, 256, 90})
+    ->Args({256, 256, 256, 95})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
     ->Repetitions(5);
 
-// SPMV benchmarks - comprehensive tile size sweeps
-BENCHMARK(BM_SPMV)
-    // 64x64 - tile sizes from 8 to 64
-    ->Args({64, 64, 8, 8})
-    ->Args({64, 64, 16, 16})
-    ->Args({64, 64, 32, 32})
-    ->Args({64, 64, 64, 64})
-    // Non-square tiles for 64
-    ->Args({64, 64, 16, 32})
-    ->Args({64, 64, 32, 16})
-    // 128x128 - tile sizes from 8 to 128
-    ->Args({128, 128, 8, 8})
-    ->Args({128, 128, 16, 16})
-    ->Args({128, 128, 32, 32})
-    ->Args({128, 128, 64, 64})
-    ->Args({128, 128, 128, 128})
-    // Non-square tiles for 128
-    ->Args({128, 128, 16, 32})
-    ->Args({128, 128, 32, 64})
-    ->Args({128, 128, 64, 32})
-    // 256x256 - tile sizes from 8 to 256
-    ->Args({256, 256, 8, 8})
-    ->Args({256, 256, 16, 16})
-    ->Args({256, 256, 32, 32})
-    ->Args({256, 256, 64, 64})
-    ->Args({256, 256, 128, 128})
-    ->Args({256, 256, 256, 256})
-    // Non-square tiles for 256
-    ->Args({256, 256, 32, 64})
-    ->Args({256, 256, 64, 128})
-    ->Args({256, 256, 128, 64})
-    // 512x512 - tile sizes from 8 to 512
-    ->Args({512, 512, 8, 8})
-    ->Args({512, 512, 16, 16})
-    ->Args({512, 512, 32, 32})
-    ->Args({512, 512, 64, 64})
-    ->Args({512, 512, 128, 128})
-    ->Args({512, 512, 256, 256})
-    ->Args({512, 512, 512, 512})
-    // Non-square tiles for 512
-    ->Args({512, 512, 64, 128})
-    ->Args({512, 512, 128, 256})
-    ->Args({512, 512, 256, 128})
-    // 1024x1024 - tile sizes from 8 to 1024
-    ->Args({1024, 1024, 8, 8})
-    ->Args({1024, 1024, 16, 16})
-    ->Args({1024, 1024, 32, 32})
-    ->Args({1024, 1024, 64, 64})
-    ->Args({1024, 1024, 128, 128})
-    ->Args({1024, 1024, 256, 256})
-    ->Args({1024, 1024, 512, 512})
-    ->Args({1024, 1024, 1024, 1024})
-    // Non-square tiles for 1024
-    ->Args({1024, 1024, 128, 256})
-    ->Args({1024, 1024, 256, 512})
-    ->Args({1024, 1024, 512, 256})
-#ifndef QUICK_RUN
-    // 4096x4096 - tile sizes from 8 to 1024
-    ->Args({4096, 4096, 8, 8})
-    ->Args({4096, 4096, 16, 16})
-    ->Args({4096, 4096, 32, 32})
-    ->Args({4096, 4096, 64, 64})
-    ->Args({4096, 4096, 128, 128})
-    ->Args({4096, 4096, 256, 256})
-    ->Args({4096, 4096, 512, 512})
-    ->Args({4096, 4096, 1024, 1024})
-    // Non-square tiles for 4096
-    ->Args({4096, 4096, 256, 512})
-    ->Args({4096, 4096, 512, 1024})
-    ->Args({4096, 4096, 1024, 512})
-#endif
+// SPMM SIMD variant registrations
+BENCHMARK(BM_SPMM_SIMD)
+    ->Args({256, 256, 256, 50})
+    ->Args({256, 256, 256, 55})
+    ->Args({256, 256, 256, 60})
+    ->Args({256, 256, 256, 65})
+    ->Args({256, 256, 256, 70})
+    ->Args({256, 256, 256, 75})
+    ->Args({256, 256, 256, 80})
+    ->Args({256, 256, 256, 85})
+    ->Args({256, 256, 256, 90})
+    ->Args({256, 256, 256, 95})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(5);
+
+// SPMM SIMD+Parallel variant registrations
+BENCHMARK(BM_SPMM_SIMD_PAR)
+    ->Args({256, 256, 256, 50})
+    ->Args({256, 256, 256, 55})
+    ->Args({256, 256, 256, 60})
+    ->Args({256, 256, 256, 65})
+    ->Args({256, 256, 256, 70})
+    ->Args({256, 256, 256, 75})
+    ->Args({256, 256, 256, 80})
+    ->Args({256, 256, 256, 85})
+    ->Args({256, 256, 256, 90})
+    ->Args({256, 256, 256, 95})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(5);
+
+// SPMM Tiled+SIMD+Parallel variant registrations (fixed 16x16 tile)
+BENCHMARK(BM_SPMM_TILED)
+    ->Args({256, 256, 256, 50})
+    ->Args({256, 256, 256, 55})
+    ->Args({256, 256, 256, 60})
+    ->Args({256, 256, 256, 65})
+    ->Args({256, 256, 256, 70})
+    ->Args({256, 256, 256, 75})
+    ->Args({256, 256, 256, 80})
+    ->Args({256, 256, 256, 85})
+    ->Args({256, 256, 256, 90})
+    ->Args({256, 256, 256, 95})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(5);
+
+// SPMV Naive variant registrations - sweep sparsity levels (50-95%)
+BENCHMARK(BM_SPMV_NAIVE)
+    ->Args({256, 256, 50})
+    ->Args({256, 256, 55})
+    ->Args({256, 256, 60})
+    ->Args({256, 256, 65})
+    ->Args({256, 256, 70})
+    ->Args({256, 256, 75})
+    ->Args({256, 256, 80})
+    ->Args({256, 256, 85})
+    ->Args({256, 256, 90})
+    ->Args({256, 256, 95})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(5);
+
+// SPMV Parallel variant registrations
+BENCHMARK(BM_SPMV_PARALLEL)
+    ->Args({256, 256, 50})
+    ->Args({256, 256, 55})
+    ->Args({256, 256, 60})
+    ->Args({256, 256, 65})
+    ->Args({256, 256, 70})
+    ->Args({256, 256, 75})
+    ->Args({256, 256, 80})
+    ->Args({256, 256, 85})
+    ->Args({256, 256, 90})
+    ->Args({256, 256, 95})
+    ->Unit(benchmark::kMicrosecond)
+    ->Iterations(1)
+    ->Repetitions(5);
+
+// SPMV Tiled+Parallel variant registrations (fixed 16x16 tile)
+BENCHMARK(BM_SPMV_TILED)
+    ->Args({256, 256, 50})
+    ->Args({256, 256, 55})
+    ->Args({256, 256, 60})
+    ->Args({256, 256, 65})
+    ->Args({256, 256, 70})
+    ->Args({256, 256, 75})
+    ->Args({256, 256, 80})
+    ->Args({256, 256, 85})
+    ->Args({256, 256, 90})
+    ->Args({256, 256, 95})
     ->Unit(benchmark::kMicrosecond)
     ->Iterations(1)
     ->Repetitions(5);
