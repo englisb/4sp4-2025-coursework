@@ -446,17 +446,7 @@ Occupancy measures active warps per SM: Ada has 128 warps per SM (4,096 threads)
 
 The GPU sparse kernels show consistent speedup with increasing sparsity across all implementations. The SpMV runtime plot demonstrates that baseline implementation scales linearly with sparsity reduction (~50 µs at 50% sparsity down to ~10 µs at 90% sparsity), a 5× speedup. The coalesced and combined optimizations maintain comparable performance, indicating that the primary benefit comes from reduced non-zero element processing rather than memory access pattern improvements. The SpMM runtime plot shows similar trends: baseline drops from ~30,000 µs at 50% sparsity to ~4,000 µs at 90% sparsity (7.5× speedup), with shared memory optimization (orange) providing the largest improvement, reaching >80 GFLOPs at 90% sparsity compared to baseline's ~70 GFLOPs. This demonstrates that shared memory usage effectively reduces global memory pressure, allowing sparse kernels to sustain high throughput even with irregular access patterns. The consistent improvement across all sparsity levels shows that sparse matrix structure is efficiently exploited on GPU through warp-level parallelism and shared memory tiling.
 
-### Plot(s) 4: Bonus - Advanced Pruning and Vendor Comparison
-
-**Alternative Pruning Method:**
-
-![Alternative Pruning Comparison](plots/bonus_pruning_comparison.png)
-*Description:* Runtime and accuracy comparison between magnitude-based and structured/block-wise pruning showing 30-40% better performance at 80-90% sparsity while maintaining similar 80-85% accuracy through improved memory access patterns.
-
-**Vendor Library Comparisons:**
-
-![Vendor Library Comparison CPU](plots/bonus_vendor_comparison_cpu.png)
-*Description:* CPU sparse NN performance versus Intel MKL dense operations across matrix sizes, demonstrating that optimized sparse implementations reach 75-85% of MKL performance with potential to achieve 1.2x speedup target through kernel fusion.
+### Plot(s) 4: Bonus - Advanced Pruning
 
 **Sparsity Bonus Implementation Analysis**
 ![Vendor Library Comparison GPU](plots/sparsity_comparison.png)
