@@ -1,0 +1,8 @@
+build/
+data/
+venv/
+.cache/
+*.out
+compile_commands.json
+logs/
+plots/  

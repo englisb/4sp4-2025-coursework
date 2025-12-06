@@ -80,6 +80,8 @@ add_executable(project
         src/dense_nn.cpp
         src/gemm.cpp
         src/gemv.cpp
+        src/spmm.cpp
+        src/spmv.cpp
         main_bench.cpp
 )
 target_compile_options(project PRIVATE -mavx2 -mfma -march=native)
@@ -91,8 +93,11 @@ target_link_libraries(project
 add_executable(nn_cpu
         src/utils.cpp
         src/dense_nn.cpp
+        src/sparse_nn.cpp
         src/gemm.cpp
         src/gemv.cpp
+        src/spmm.cpp
+        src/spmv.cpp
         nn_cpu_bench.cpp
 )
 target_compile_options(nn_cpu PRIVATE -mavx2 -mfma -march=native)
