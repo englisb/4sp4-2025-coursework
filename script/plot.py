@@ -830,7 +830,9 @@ def collect_nn(json_path):
     
     if dense_records:
         median_time = statistics.median([r['time_s'] for r in dense_records])
-        avg_accuracy = statistics.mean([r['accuracy'] for r in dense_records]) if dense_records[0]['accuracy'] > 0 else 0
+        # Check if any record has non-zero accuracy
+        accuracies = [r['accuracy'] for r in dense_records]
+        avg_accuracy = statistics.mean(accuracies) if any(acc > 0 for acc in accuracies) else 0
         result['dense'] = {
             'time_s': median_time,
             'accuracy': avg_accuracy
@@ -838,7 +840,9 @@ def collect_nn(json_path):
     
     if mkl_records:
         median_time = statistics.median([r['time_s'] for r in mkl_records])
-        avg_accuracy = statistics.mean([r['accuracy'] for r in mkl_records]) if mkl_records[0]['accuracy'] > 0 else 0
+        # Check if any record has non-zero accuracy
+        accuracies = [r['accuracy'] for r in mkl_records]
+        avg_accuracy = statistics.mean(accuracies) if any(acc > 0 for acc in accuracies) else 0
         result['mkl'] = {
             'time_s': median_time,
             'accuracy': avg_accuracy
@@ -850,7 +854,9 @@ def collect_nn(json_path):
         for opt_label, records in opt_dict.items():
             if records:
                 median_time = statistics.median([r['time_s'] for r in records])
-                avg_accuracy = statistics.mean([r['accuracy'] for r in records]) if records[0]['accuracy'] > 0 else 0
+                # Check if any record has non-zero accuracy
+                accuracies = [r['accuracy'] for r in records]
+                avg_accuracy = statistics.mean(accuracies) if any(acc > 0 for acc in accuracies) else 0
                 result['sparse'][sparsity][opt_label] = {
                     'time_s': median_time,
                     'accuracy': avg_accuracy
@@ -940,60 +946,62 @@ def plot_nn(nn_data, suffix=''):
     plt.savefig(f'./plots/nn_sparsity_runtime{suffix}.png', dpi=150)
     print(f'Saved ./plots/nn_sparsity_runtime{suffix}.png')
     
-    # Accuracy comparison if available (plot whenever an accuracy field exists, even if zero)
-    has_accuracy = False
-    for sp in sparsity_levels:
-        entry = sparse_data.get(sp, {})
-        if isinstance(entry, dict):
-            if 'accuracy' in entry:
-                has_accuracy = True
-                break
-            for opt_label, data in entry.items():
-                if isinstance(data, dict) and 'accuracy' in data:
+    # Accuracy comparison only for CPU benchmarks (skip for GPU)
+    if 'gpu' not in suffix.lower():
+        # Accuracy comparison if available (plot whenever an accuracy field exists, even if zero)
+        has_accuracy = False
+        for sp in sparsity_levels:
+            entry = sparse_data.get(sp, {})
+            if isinstance(entry, dict):
+                if 'accuracy' in entry:
                     has_accuracy = True
                     break
-        if has_accuracy:
-            break
+                for opt_label, data in entry.items():
+                    if isinstance(data, dict) and 'accuracy' in data:
+                        has_accuracy = True
+                        break
+            if has_accuracy:
+                break
 
-    if has_accuracy:
-        plt.figure(figsize=(14, 6))
-        
-        for idx, technique in enumerate(all_techniques):
-            accuracies = []
-            for sp in sparsity_levels:
-                entry = sparse_data.get(sp, {})
-                if technique is None:
-                    if isinstance(entry, dict) and 'accuracy' in entry:
-                        accuracies.append(entry.get('accuracy', 0))
-                    else:
-                        accuracies.append(0)
-                else:
-                    if isinstance(entry, dict) and technique in entry:
-                        accuracies.append(entry[technique].get('accuracy', 0))
-                    else:
-                        accuracies.append(0)
+        if has_accuracy:
+            plt.figure(figsize=(14, 6))
             
-            offset = width * (idx - len(all_techniques)/2 + 0.5)
-            bars = plt.bar([p + offset for p in x_pos], accuracies, width, label=technique if technique else 'Sparse NN', color=colors[idx])
-        
-        if dense_data and dense_data.get('accuracy', 0) > 0:
-            dense_acc = dense_data['accuracy']
-            plt.axhline(y=dense_acc, color='#1f77b4', linestyle='--', linewidth=2, label='Dense NN')
-        
-        if mkl_data and mkl_data.get('accuracy', 0) > 0:
-            mkl_acc = mkl_data['accuracy']
-            plt.axhline(y=mkl_acc, color='#d62728', linestyle='-.', linewidth=2, label='Dense NN (MKL)')
-        
-        plt.ylabel('Accuracy (%)')
-        plt.xlabel('Sparsity Level')
-        plt.title('Neural Network Accuracy vs Sparsity Level by Optimization Technique')
-        plt.xticks(x_pos, [f"{sp}%" for sp in sparsity_levels])
-        plt.ylim([0, 100])
-        plt.legend(loc='best', fontsize=9)
-        plt.grid(axis='y', alpha=0.3)
-        plt.tight_layout()
-        plt.savefig(f'./plots/nn_sparsity_accuracy{suffix}.png', dpi=150)
-        print(f'Saved ./plots/nn_sparsity_accuracy{suffix}.png')
+            for idx, technique in enumerate(all_techniques):
+                accuracies = []
+                for sp in sparsity_levels:
+                    entry = sparse_data.get(sp, {})
+                    if technique is None:
+                        if isinstance(entry, dict) and 'accuracy' in entry:
+                            accuracies.append(entry.get('accuracy', 0))
+                        else:
+                            accuracies.append(0)
+                    else:
+                        if isinstance(entry, dict) and technique in entry:
+                            accuracies.append(entry[technique].get('accuracy', 0))
+                        else:
+                            accuracies.append(0)
+                
+                offset = width * (idx - len(all_techniques)/2 + 0.5)
+                bars = plt.bar([p + offset for p in x_pos], accuracies, width, label=technique if technique else 'Sparse NN', color=colors[idx])
+            
+            if dense_data and dense_data.get('accuracy', 0) > 0:
+                dense_acc = dense_data['accuracy']
+                plt.axhline(y=dense_acc, color='#1f77b4', linestyle='--', linewidth=2, label='Dense NN')
+            
+            if mkl_data and mkl_data.get('accuracy', 0) > 0:
+                mkl_acc = mkl_data['accuracy']
+                plt.axhline(y=mkl_acc, color='#d62728', linestyle='-.', linewidth=2, label='Dense NN (MKL)')
+            
+            plt.ylabel('Accuracy (%)')
+            plt.xlabel('Sparsity Level')
+            plt.title('Neural Network Accuracy vs Sparsity Level by Optimization Technique')
+            plt.xticks(x_pos, [f"{sp}%" for sp in sparsity_levels])
+            plt.ylim([0, 100])
+            plt.legend(loc='best', fontsize=9)
+            plt.grid(axis='y', alpha=0.3)
+            plt.tight_layout()
+            plt.savefig(f'./plots/nn_sparsity_accuracy{suffix}.png', dpi=150)
+            print(f'Saved ./plots/nn_sparsity_accuracy{suffix}.png')
 
 
 def plot_gemm(records, suffix=''):
