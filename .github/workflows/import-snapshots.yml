@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 0
+          fetch-depth: 1
           token: ${{ secrets.IMPORT_TOKEN }}
 
       - name: Import source snapshots
@@ -45,7 +45,7 @@ jobs:
             target_dir="${entry##*:}"
             clone_dir="${tmp_root}/${target_dir}"
 
-            rm -rf "${clone_dir}" "${target_dir}"
+            rm -rf "${target_dir}"
 
             git clone --branch main --single-branch \
               "https://x-access-token:${IMPORT_TOKEN}@github.com/${source_repo}.git" \
