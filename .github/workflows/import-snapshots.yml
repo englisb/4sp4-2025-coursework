@@ -52,9 +52,7 @@ jobs:
               "${clone_dir}"
 
             mkdir -p "${target_dir}"
-            shopt -s dotglob
-            cp -a "${clone_dir}"/* "${target_dir}/"
-            shopt -u dotglob
+            cp -a "${clone_dir}/." "${target_dir}/"
             rm -rf "${target_dir}/.git"
           done
 
