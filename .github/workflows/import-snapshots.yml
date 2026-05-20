@@ -1,0 +1,69 @@
+name: Import snapshots
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.IMPORT_TOKEN }}
+
+      - name: Import source snapshots
+        shell: bash
+        env:
+          IMPORT_TOKEN: ${{ secrets.IMPORT_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          tmp_root="${RUNNER_TEMP}/snapshot-imports"
+          mkdir -p "${tmp_root}"
+
+          repos=(
+            "englisb/lab-01-4sp4-2025-13:lab01"
+            "englisb/lab-02-4sp4-2025-13:lab02"
+            "englisb/lab-03-4sp4-2025-13:lab03"
+            "englisb/lab-04-4sp4-2025-13:lab04"
+            "englisb/tutorial-02-4sp4-2025-englisb:tut02"
+            "englisb/project-4sp4-2025-13:project"
+          )
+
+          for entry in "${repos[@]}"; do
+            source_repo="${entry%%:*}"
+            target_dir="${entry##*:}"
+            clone_dir="${tmp_root}/${target_dir}"
+
+            rm -rf "${clone_dir}" "${target_dir}"
+
+            git clone --branch main --single-branch \
+              "https://x-access-token:${IMPORT_TOKEN}@github.com/${source_repo}.git" \
+              "${clone_dir}"
+
+            mkdir -p "${target_dir}"
+            shopt -s dotglob
+            cp -a "${clone_dir}"/* "${target_dir}/"
+            shopt -u dotglob
+            rm -rf "${target_dir}/.git"
+          done
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes detected; nothing to commit."
+            exit 0
+          fi
+
+          git commit -m "Import latest snapshots from coursework source repositories"
+          git push origin HEAD:main
